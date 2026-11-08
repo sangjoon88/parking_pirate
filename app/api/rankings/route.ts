@@ -2,7 +2,7 @@ import { sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { handle, requireUser } from "@/lib/auth";
-import { MONTH_START_KST } from "@/lib/doubloons";
+import { EARNING, MONTH_START_KST } from "@/lib/doubloons";
 
 type Row = { user_id: string; nickname: string; score: string | number };
 
@@ -18,8 +18,8 @@ export const GET = handle(async () => {
     top(sql`
       select u.id as user_id, u.nickname, sum(l.amount) as score
       from doubloon_logs l join users u on u.id = l.user_id
-      where l.created_at >= ${MONTH_START_KST} and u.status = 'active'
-      group by u.id, u.nickname having sum(l.amount) > 0
+      where l.created_at >= ${MONTH_START_KST} and u.status = 'active' and ${EARNING}
+      group by u.id, u.nickname
       order by score desc, min(l.created_at) asc limit 5`),
     top(sql`
       select u.id as user_id, u.nickname, count(*) as score

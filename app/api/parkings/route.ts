@@ -5,7 +5,9 @@ import { parkings, spots } from "@/db/schema";
 import { bad, handle, readJson, requireUser } from "@/lib/auth";
 import { PARKING_MAX_HOURS } from "@/lib/constants";
 import { award, awardedRecently } from "@/lib/doubloons";
-import { FLEET_SIZE, PARKING_REWARD_COOLDOWN_HOURS, REWARD } from "@/lib/game";
+import { boosted, FLEET_SIZE, PARKING_REWARD_COOLDOWN_HOURS, REWARD, TOLL } from "@/lib/game";
+import { lordsBySpot } from "@/lib/lords";
+import { claimStash, claimTreasure } from "@/lib/treasure";
 import { distanceMeters, isValidCoord, PARKING_RADIUS_M } from "@/lib/geo";
 import { activeParkersAt, closeStaleParkings, getActiveParking } from "@/lib/parking";
 
@@ -39,9 +41,34 @@ export const POST = handle(async (req: Request) => {
 
   // 정박 보상: 짧은 시간에 반복 정박해서 버는 것 방지
   let earned = 0;
+  const events: string[] = [];
   if (!(await awardedRecently(user.id, "parking", PARKING_REWARD_COOLDOWN_HOURS))) {
-    await award(user.id, REWARD.parking, "parking", spot.id);
-    earned += REWARD.parking;
+    const amount = boosted("parking", REWARD.parking);
+    await award(user.id, amount, "parking", spot.id);
+    earned += amount;
+
+    // 통행세: 영주가 아닌 선원이 정박하면 영주에게 (정박 금화와 같은 쿨다운)
+    const lord = (await lordsBySpot(spot.id)).get(spot.id);
+    if (lord && lord.userId !== user.id) {
+      await award(lord.userId, TOLL, "toll", spot.id);
+      events.push(`🏰 영주 ${lord.nickname}님께 통행세 ${TOLL}두블룬이 갔어요`);
+    }
+  }
+
+  // 오늘의 보물상자
+  const treasure = await claimTreasure(user.id, spot.id);
+  if (treasure > 0) {
+    await award(user.id, treasure, "treasure", spot.id);
+    earned += treasure;
+    events.push(`📦 오늘의 보물상자 발견! +${treasure}`);
+  }
+
+  // 다른 선원이 묻어 둔 보물
+  const stash = await claimStash(user.id, spot.id);
+  if (stash) {
+    await award(user.id, stash.amount, "stash_found", spot.id);
+    earned += stash.amount;
+    events.push(`🪙 ${stash.by}님이 묻어 둔 보물 발견! +${stash.amount}`);
   }
 
   // 함대 집결: 3명 이상 모이면 그 자리의 모두에게 (같은 정박지에서 12시간에 한 번)
@@ -57,5 +84,5 @@ export const POST = handle(async (req: Request) => {
     }
   }
 
-  return NextResponse.json({ parking: await getActiveParking(user.id), earned, fleet }, { status: 201 });
+  return NextResponse.json({ parking: await getActiveParking(user.id), earned, fleet, events }, { status: 201 });
 });

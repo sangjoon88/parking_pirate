@@ -16,6 +16,8 @@ export const GET = handle(async () => {
         referrerId: users.referrerId,
         role: users.role,
         status: users.status,
+        flag: users.flag,
+        nameColor: users.nameColor,
         createdAt: users.createdAt,
       })
       .from(users)

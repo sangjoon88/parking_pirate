@@ -4,16 +4,18 @@ import { useState } from "react";
 import { api } from "@/lib/api";
 import { NOTE_MAX } from "@/lib/constants";
 import { GUARD_LABELS, guardColor } from "@/lib/format";
-import type { SpotSummary } from "@/lib/types";
+import type { SpotSummary, WeatherId } from "@/lib/types";
 import Sheet from "./Sheet";
 import { Button, ErrorText } from "./ui";
 
 export default function ReportSheet({
   spot,
+  weather,
   onClose,
   onDone,
 }: {
   spot: SpotSummary;
+  weather: WeatherId;
   onClose: () => void;
   onDone: (result: { closed: boolean; earned: number; bounty: number }) => void;
 }) {
@@ -47,7 +49,19 @@ export default function ReportSheet({
           <h2 className="truncate text-lg font-black">{spot.name}</h2>
         </>
       }
+      footer={
+        <Button
+          onClick={submit}
+          disabled={busy || (guardLevel === null && gateStatus === null && !note.trim())}
+          className="w-full"
+        >
+          {busy ? "기록 중…" : "일지 남기기"}
+        </Button>
+      }
     >
+      {weather === "storm" && (
+        <p className="mb-3 rounded-xl bg-sea-700 px-3 py-2 text-xs font-bold">🌪 폭풍 주간: 이번 주 일지 금화 2배!</p>
+      )}
       <section>
         <h3 className="mb-2 text-sm font-bold text-slate-300">경계 레벨</h3>
         <div className="grid grid-cols-5 gap-1.5">
@@ -108,12 +122,9 @@ export default function ReportSheet({
         />
       </section>
 
-      <div className="mt-3">
+      <div className="mt-3 pb-1">
         <ErrorText>{error}</ErrorText>
       </div>
-      <Button onClick={submit} disabled={busy || (guardLevel === null && gateStatus === null && !note.trim())} className="mt-3 w-full">
-        {busy ? "기록 중…" : "일지 남기기"}
-      </Button>
     </Sheet>
   );
 }

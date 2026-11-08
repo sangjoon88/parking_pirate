@@ -6,7 +6,10 @@ import { BADGES, type BadgeId } from "./game";
 export type BadgeStatus = { id: BadgeId; icon: string; name: string; desc: string; earned: boolean; progress: string };
 
 /** 한 선원의 배지 획득 현황 (기록에서 계산) */
-export async function badgesFor(userId: string): Promise<BadgeStatus[]> {
+export async function badgesFor(
+  userId: string,
+  opts: { isLord: boolean; createdAt: Date },
+): Promise<BadgeStatus[]> {
   const [countsRes, daysRes] = await Promise.all([
     db.execute<Record<string, string | number>>(sql`
       select
@@ -17,7 +20,9 @@ export async function badgesFor(userId: string): Promise<BadgeStatus[]> {
             or extract(hour from started_at at time zone 'Asia/Seoul') < 5)) as night,
         (select count(*) from doubloon_logs where user_id = ${userId} and reason = 'new_cell') as cells,
         (select count(*) from doubloon_logs where user_id = ${userId} and reason = 'fleet') as fleets,
-        (select count(*) from doubloon_logs where user_id = ${userId} and reason = 'bounty') as bounties
+        (select count(*) from doubloon_logs where user_id = ${userId} and reason = 'bounty') as bounties,
+        (select count(*) from doubloon_logs where user_id = ${userId} and reason in ('treasure', 'stash_found')) as treasures,
+        (select count(*) from doubloon_logs where user_id = ${userId} and reason = 'duel_win') as duel_wins
     `),
     db.execute<{ d: string }>(sql`
       select distinct to_char(started_at at time zone 'Asia/Seoul', 'YYYY-MM-DD') as d
@@ -45,6 +50,10 @@ export async function badgesFor(userId: string): Promise<BadgeStatus[]> {
     fleet: [c.fleets, 1],
     hunter: [c.bounties, 3],
     scout: [c.reports, 20],
+    lord: [opts.isLord ? 1 : 0, 1],
+    treasure: [c.treasures, 1],
+    duelist: [c.duel_wins, 1],
+    veteran: [Math.floor((Date.now() - opts.createdAt.getTime()) / 86400_000), 100],
   };
 
   return (Object.keys(BADGES) as BadgeId[]).map((id) => {

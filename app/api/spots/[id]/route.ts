@@ -3,12 +3,13 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { spotReports, users } from "@/db/schema";
 import { bad, handle, requireUser } from "@/lib/auth";
+import { balanceOf } from "@/lib/doubloons";
 import { listSpots } from "@/lib/spots";
 
 const UUID = /^[0-9a-f-]{36}$/i;
 
 export const GET = handle(async (_req: Request, ctx: { params: Promise<{ id: string }> }) => {
-  await requireUser();
+  const user = await requireUser();
   const { id } = await ctx.params;
   if (!UUID.test(id)) bad("정박지를 찾을 수 없어요.", 404);
   const {
@@ -31,5 +32,5 @@ export const GET = handle(async (_req: Request, ctx: { params: Promise<{ id: str
     .orderBy(desc(spotReports.createdAt))
     .limit(3);
 
-  return NextResponse.json({ spot, reports });
+  return NextResponse.json({ spot, reports, me: { id: user.id, balance: await balanceOf(user.id) } });
 });

@@ -5,7 +5,8 @@ import { spotReports, spots } from "@/db/schema";
 import { bad, handle, readJson, requireUser } from "@/lib/auth";
 import { GATE_CLOSE_THRESHOLD, NOTE_MAX } from "@/lib/constants";
 import { award, awardedRecently } from "@/lib/doubloons";
-import { bountyFor, REPORT_COOLDOWN_HOURS, REWARD } from "@/lib/game";
+import { boosted, REPORT_COOLDOWN_HOURS, REWARD } from "@/lib/game";
+import { totalBounty } from "@/lib/spots";
 
 /** 항해 일지 작성 */
 export const POST = handle(async (req: Request) => {
@@ -33,24 +34,40 @@ export const POST = handle(async (req: Request) => {
   let earned = 0;
   let bounty = 0;
   if (!alreadyRewarded) {
-    await award(user.id, REWARD.report, "report", spotId);
-    earned += REWARD.report;
+    const amount = boosted("report", REWARD.report);
+    await award(user.id, amount, "report", spotId);
+    earned += amount;
   }
 
   let closed = false;
   if (gateStatus === "no_gate") {
     // 현상금: 오래 확인 안 된 정박지를 "그대로 없음"으로 확인하면 획득.
     // 행을 잠그고 "이전 확인 시각"을 읽으면서 갱신하는 한 문장이라, 동시에 써도 한 명만 받는다.
-    const res = await db.execute<{ prev: Date | string | null; created_at: Date | string; status: string }>(sql`
+    // 선원이 건 현상금도 함께 받아 가고 0으로 비운다.
+    const res = await db.execute<{
+      prev: Date | string | null;
+      created_at: Date | string;
+      status: "open" | "closed";
+      posted: number | string;
+    }>(sql`
       with old as (
-        select last_confirmed_at as prev, created_at, status from spots where id = ${spotId} for update
+        select last_confirmed_at as prev, created_at, status, posted_bounty as posted
+        from spots where id = ${spotId} for update
       )
-      update spots s set last_confirmed_at = now()
+      update spots s set last_confirmed_at = now(),
+        posted_bounty = case when old.status = 'open' then 0 else s.posted_bounty end
       from old where s.id = ${spotId}
-      returning old.prev, old.created_at, old.status
+      returning old.prev, old.created_at, old.status, old.posted
     `);
     const old = res.rows[0];
-    const due = old && old.status === "open" ? bountyFor(old.prev, old.created_at) : 0;
+    const due = old
+      ? totalBounty({
+          status: old.status,
+          lastConfirmedAt: old.prev,
+          createdAt: old.created_at,
+          postedBounty: Number(old.posted),
+        })
+      : 0;
     if (due > 0) {
       await award(user.id, due, "bounty", spotId);
       bounty = due;

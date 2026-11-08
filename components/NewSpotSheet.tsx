@@ -53,7 +53,6 @@ export default function NewSpotSheet({
       onCreated(res.id, res.earned, res.newCell);
     } catch (err) {
       if (err instanceof ApiError && err.status === 409 && err.data.existing) {
-        alert("이미 등록된 정박지가 있어요. 그쪽으로 이동할게요.");
         onDuplicate(err.data.existing as ExistingSpot);
         return;
       }

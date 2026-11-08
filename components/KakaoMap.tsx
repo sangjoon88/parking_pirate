@@ -6,7 +6,7 @@ import { guardColor } from "@/lib/format";
 import { loadKakao, type Kakao, type LatLng } from "@/lib/kakao";
 import { STALE_DAYS } from "@/lib/constants";
 import { FLEET_SIZE } from "@/lib/game";
-import type { SpotSummary } from "@/lib/types";
+import type { RadioMessage, SpotSummary } from "@/lib/types";
 import { YEOUIDO_CELLS } from "@/lib/yeouido";
 
 export type KakaoMapHandle = {
@@ -27,7 +27,29 @@ type Props = {
   onReady?: (kakao: Kakao) => void;
   /** 해도 모드: 밝혀진 해역 칸 id 목록. null이면 해도를 그리지 않는다 */
   fogExplored?: Set<string> | null;
+  /** 무전기 쪽지 */
+  radios?: RadioMessage[];
 };
+
+/** 무전 말풍선 (사용자 글은 textContent로 넣어 HTML 주입을 막는다) */
+function radioEl(m: RadioMessage): HTMLElement {
+  const el = document.createElement("div");
+  el.style.cssText =
+    "transform:translateY(-100%);margin-top:-6px;max-width:180px;background:#fff;color:#07111f;border-radius:12px;padding:5px 9px;box-shadow:0 2px 8px rgba(0,0,0,.45);font:600 12px/1.35 sans-serif;position:relative";
+  const who = document.createElement("div");
+  who.style.cssText = "font-size:10px;color:#64748b;font-weight:700";
+  const mins = Math.max(0, Math.floor((Date.now() - new Date(m.createdAt).getTime()) / 60000));
+  who.textContent = `📻 ${m.nickname} · ${mins < 1 ? "방금" : `${mins}분 전`}`;
+  const body = document.createElement("div");
+  body.style.cssText = "word-break:break-all";
+  body.textContent = m.text;
+  const tail = document.createElement("div");
+  tail.style.cssText =
+    "position:absolute;left:50%;bottom:-6px;transform:translateX(-50%);border:6px solid transparent;border-top-color:#fff;border-bottom:0";
+  el.append(who, body, tail);
+  if (m.mine) el.style.outline = "2px solid #f5c451";
+  return el;
+}
 
 const LONG_PRESS_MS = 600;
 
@@ -48,13 +70,22 @@ function pinHtml(s: SpotSummary, selected: boolean) {
   const navy = s.navyAlert
     ? tag("top:-6px;left:-12px", "#dc2626", "#fff", "⚠", "animation:pp-blink 1s steps(2) infinite")
     : "";
+  const lord = s.lord
+    ? `<span style="position:absolute;bottom:-2px;right:-8px;width:22px;height:22px;border-radius:50%;background:#0b1a2e;border:2px solid #f5c451;font-size:12px;line-height:18px;text-align:center">${s.lord.flag}</span>`
+    : "";
+  const treasure = s.treasure
+    ? `<span style="position:absolute;top:-22px;left:50%;transform:translateX(-50%);font-size:20px;animation:pp-bob 1.2s ease-in-out infinite">📦</span>`
+    : "";
+  // 전설의 정박지: 금테 + 빛
+  const border = selected ? "#f5c451" : s.legendary ? "#f5c451" : "#fff";
+  const glow = s.legendary ? ",0 0 0 3px #07111f,0 0 14px 4px rgba(245,196,81,.8)" : "";
   // 오래 확인 안 된 핀은 흐리게 (현상금 표시는 또렷하게 유지)
   return `
     <div data-spot="${s.id}" style="position:relative;transform:translateY(-50%) scale(${scale});transform-origin:bottom center;cursor:pointer;padding:8px">
-      <div style="opacity:${stale ? 0.45 : 1};width:34px;height:34px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:${color};border:3px solid ${selected ? "#f5c451" : "#fff"};box-shadow:0 2px 6px rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center">
+      <div style="opacity:${stale ? 0.45 : 1};width:34px;height:34px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:${color};border:3px solid ${border};box-shadow:0 2px 6px rgba(0,0,0,.5)${glow};display:flex;align-items:center;justify-content:center">
         <span style="transform:rotate(45deg);font-size:16px;line-height:1">${icon}</span>
       </div>
-      ${crown}${count}${navy}${bounty}
+      ${treasure}${crown}${count}${navy}${lord}${bounty}
     </div>`;
 }
 
@@ -68,8 +99,10 @@ export default function KakaoMap({
   onLongPress,
   onReady,
   fogExplored = null,
+  radios = [],
 }: Props) {
   const fogRef = useRef<any[]>([]);
+  const radioRef = useRef<any[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
   const kakaoRef = useRef<Kakao | null>(null);
   const mapRef = useRef<any>(null);
@@ -246,6 +279,24 @@ export default function KakaoMap({
       return rect;
     });
   }, [ready, fogExplored]);
+
+  // 무전 말풍선
+  useEffect(() => {
+    const map = mapRef.current;
+    const kakao = kakaoRef.current;
+    if (!ready || !map || !kakao) return;
+    radioRef.current.forEach((o) => o.setMap(null));
+    radioRef.current = radios.map((m) => {
+      const o = new kakao.maps.CustomOverlay({
+        position: new kakao.maps.LatLng(m.lat, m.lng),
+        content: radioEl(m),
+        yAnchor: 0,
+        zIndex: 5,
+      });
+      o.setMap(map);
+      return o;
+    });
+  }, [ready, radios]);
 
   return (
     <div className="absolute inset-0">

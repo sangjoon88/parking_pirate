@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { users, type User } from "@/db/schema";
 import { SESSION_COOKIE, SESSION_DAYS } from "./constants";
+import { HttpError } from "./errors";
 import { signSession, verifySession } from "./session";
 
 export async function setSessionCookie(user: Pick<User, "id" | "nickname" | "role">) {
@@ -34,14 +35,7 @@ export async function getCurrentUser(): Promise<User | null> {
   return user;
 }
 
-export class HttpError extends Error {
-  constructor(
-    public status: number,
-    message: string,
-  ) {
-    super(message);
-  }
-}
+export { HttpError };
 
 export async function requireUser(): Promise<User> {
   const user = await getCurrentUser();

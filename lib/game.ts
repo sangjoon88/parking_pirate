@@ -44,7 +44,18 @@ export function nextTitle(discoveries: number): { title: string; need: number } 
   return next ? { title: next[1], need: next[0] - discoveries } : null;
 }
 
-export type BadgeId = "pioneer" | "night" | "streak" | "fleet" | "hunter" | "scout" | "cartographer";
+export type BadgeId =
+  | "pioneer"
+  | "night"
+  | "streak"
+  | "fleet"
+  | "hunter"
+  | "scout"
+  | "cartographer"
+  | "lord"
+  | "treasure"
+  | "duelist"
+  | "veteran";
 
 export const BADGES: Record<BadgeId, { icon: string; name: string; desc: string }> = {
   pioneer: { icon: "🚩", name: "개척자", desc: "정박지를 처음 발견" },
@@ -54,6 +65,10 @@ export const BADGES: Record<BadgeId, { icon: string; name: string; desc: string 
   fleet: { icon: "⛵", name: "함대 집결", desc: "한 정박지에 3명 이상 함께 정박" },
   hunter: { icon: "💰", name: "현상금 사냥꾼", desc: "현상금 3회 획득" },
   scout: { icon: "🔭", name: "정찰병", desc: "항해 일지 20개 작성" },
+  lord: { icon: "🏰", name: "영주", desc: "정박지의 영주가 됨" },
+  treasure: { icon: "📦", name: "보물 사냥꾼", desc: "보물상자나 묻힌 보물 발견" },
+  duelist: { icon: "⚔️", name: "결투왕", desc: "결투에서 승리" },
+  veteran: { icon: "🎖️", name: "100일 선원", desc: "승선 100일" },
 };
 
 export const FORTUNES = [
@@ -76,4 +91,80 @@ export const FORTUNES = [
 
 export function randomFortune(): string {
   return FORTUNES[Math.floor(Math.random() * FORTUNES.length)];
+}
+
+/* ───────── 3차 재미 요소 ───────── */
+
+export const TOLL = 2; // 영주가 받는 통행세 (다른 선원이 정박 금화를 받을 때)
+export const LORD_WINDOW_DAYS = 30; // 최근 30일 정박 횟수로 영주 결정
+export const LORD_MIN_PARKINGS = 2;
+export const LEGEND_PARKINGS = 100; // 누적 정박 100회면 전설의 정박지
+export const TREASURE_MIN = 20;
+export const TREASURE_MAX = 100;
+export const RADIO_MAX_LEN = 60;
+export const RADIO_TTL_MINUTES = 60;
+export const RADIO_COOLDOWN_MINUTES = 3;
+export const DUEL_DAYS = 7;
+export const DUEL_PENDING_DAYS = 2;
+export const DUEL_STAKES = [20, 50, 100, 200] as const;
+
+/** 승선 기념일 보상 */
+export const ANNIVERSARIES: { days: number; label: string; reward: number }[] = [
+  { days: 30, label: "승선 한 달", reward: 30 },
+  { days: 100, label: "승선 100일", reward: 100 },
+  { days: 365, label: "승선 1주년", reward: 365 },
+];
+
+/* 상점 */
+export const FLAGS = ["☠", "🏴‍☠️", "🦜", "🦈", "⚓", "💀", "🐙", "🦑", "🐳", "🔱", "⚔️", "🍺"] as const;
+export const NAME_COLORS: { id: string; label: string; color: string }[] = [
+  { id: "gold", label: "황금", color: "#f5c451" },
+  { id: "ruby", label: "루비", color: "#fb7185" },
+  { id: "emerald", label: "에메랄드", color: "#34d399" },
+  { id: "sapphire", label: "사파이어", color: "#60a5fa" },
+  { id: "amethyst", label: "자수정", color: "#c084fc" },
+  { id: "pearl", label: "진주", color: "#f8fafc" },
+];
+export const SHOP_PRICE = { flag: 100, color: 150 } as const;
+export const BOUNTY_POST = { min: 10, max: 200 };
+export const STASH = { min: 10, max: 200 };
+
+export function colorOf(id: string | null | undefined): string | undefined {
+  return NAME_COLORS.find((c) => c.id === id)?.color;
+}
+
+/* 바다 날씨: 주(월요일 시작, KST)마다 바뀜 */
+export type WeatherId = "calm" | "storm" | "fog" | "tailwind";
+export const WEATHERS: Record<WeatherId, { icon: string; name: string; desc: string }> = {
+  calm: { icon: "☀️", name: "잔잔한 바다", desc: "평범한 한 주" },
+  storm: { icon: "🌪", name: "폭풍 주간", desc: "항해 일지 금화 2배" },
+  fog: { icon: "🌫", name: "안개 주간", desc: "현상금 2배" },
+  tailwind: { icon: "🌊", name: "순풍 주간", desc: "정박 금화 2배" },
+};
+
+/** KST 기준 이번 주 월요일 날짜 문자열 */
+function kstWeekKey(now: Date): string {
+  const kst = new Date(now.getTime() + 9 * 3600_000);
+  const dow = (kst.getUTCDay() + 6) % 7; // 월=0
+  const monday = new Date(kst.getTime() - dow * 86400_000);
+  return monday.toISOString().slice(0, 10);
+}
+
+export function weatherFor(now = new Date()): WeatherId {
+  const key = kstWeekKey(now);
+  let h = 0;
+  for (const ch of key) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  const order: WeatherId[] = ["calm", "storm", "fog", "tailwind"];
+  return order[h % order.length];
+}
+
+/** 날씨 배율 적용 */
+export function boosted(kind: "report" | "bounty" | "parking", amount: number, now = new Date()): number {
+  const w = weatherFor(now);
+  const double = (w === "storm" && kind === "report") || (w === "fog" && kind === "bounty") || (w === "tailwind" && kind === "parking");
+  return double ? amount * 2 : amount;
+}
+
+export function kstDay(now = new Date()): string {
+  return new Date(now.getTime() + 9 * 3600_000).toISOString().slice(0, 10);
 }

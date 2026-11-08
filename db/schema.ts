@@ -19,6 +19,9 @@ export const users = pgTable("users", {
   referrerId: uuid("referrer_id").references((): AnyPgColumn => users.id),
   role: text("role", { enum: ["admin", "member"] }).notNull().default("member"),
   status: text("status", { enum: ["active", "banned"] }).notNull().default("active"),
+  // 상점에서 산 꾸미기
+  flag: text("flag").notNull().default("☠"),
+  nameColor: text("name_color"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -47,6 +50,10 @@ export const spots = pgTable("spots", {
     .references(() => users.id),
   status: text("status", { enum: ["open", "closed"] }).notNull().default("open"),
   lastConfirmedAt: timestamp("last_confirmed_at", { withTimezone: true }),
+  /** 전설의 정박지 별명 (영주가 붙임) */
+  nickname: text("nickname"),
+  /** 선원이 금화로 건 현상금 (확인한 사람이 받아감) */
+  postedBounty: integer("posted_bounty").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -107,7 +114,26 @@ export const doubloonLogs = pgTable(
       .references(() => users.id),
     amount: integer("amount").notNull(),
     reason: text("reason", {
-      enum: ["discovery", "new_cell", "report", "parking", "bounty", "fleet", "lineage", "lineage_ban"],
+      enum: [
+        "discovery",
+        "new_cell",
+        "report",
+        "parking",
+        "bounty",
+        "fleet",
+        "lineage",
+        "lineage_ban",
+        "toll",
+        "treasure",
+        "stash_hide",
+        "stash_found",
+        "bounty_post",
+        "shop",
+        "duel_stake",
+        "duel_win",
+        "duel_refund",
+        "anniversary",
+      ],
     }).notNull(),
     refId: text("ref_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -116,4 +142,75 @@ export const doubloonLogs = pgTable(
     index("doubloon_logs_user_idx").on(t.userId, t.createdAt),
     index("doubloon_logs_created_idx").on(t.createdAt),
   ],
+);
+
+/** 선원이 정박지에 묻어 둔 보물. 다음에 정박한 다른 선원이 가져간다 */
+export const stashes = pgTable(
+  "stashes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    spotId: uuid("spot_id")
+      .notNull()
+      .references(() => spots.id),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    amount: integer("amount").notNull(),
+    foundBy: uuid("found_by").references(() => users.id),
+    foundAt: timestamp("found_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("stashes_spot_idx").on(t.spotId)],
+);
+
+/** 오늘의 보물상자 (한국 날짜당 1개) */
+export const dailyTreasures = pgTable("daily_treasures", {
+  day: text("day").primaryKey(), // YYYY-MM-DD (KST)
+  spotId: uuid("spot_id")
+    .notNull()
+    .references(() => spots.id),
+  amount: integer("amount").notNull(),
+  claimedBy: uuid("claimed_by").references(() => users.id),
+  claimedAt: timestamp("claimed_at", { withTimezone: true }),
+});
+
+/** 결투: 7일 동안 정박 횟수 대결, 이긴 쪽이 판돈 2배 */
+export const duels = pgTable(
+  "duels",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    challengerId: uuid("challenger_id")
+      .notNull()
+      .references(() => users.id),
+    opponentId: uuid("opponent_id")
+      .notNull()
+      .references(() => users.id),
+    stake: integer("stake").notNull(),
+    status: text("status", { enum: ["pending", "active", "declined", "expired", "done"] })
+      .notNull()
+      .default("pending"),
+    startsAt: timestamp("starts_at", { withTimezone: true }),
+    endsAt: timestamp("ends_at", { withTimezone: true }),
+    winnerId: uuid("winner_id").references(() => users.id),
+    challengerScore: integer("challenger_score"),
+    opponentScore: integer("opponent_score"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("duels_challenger_idx").on(t.challengerId), index("duels_opponent_idx").on(t.opponentId)],
+);
+
+/** 무전기: 지도 위 한 줄 쪽지 (1시간 뒤 사라짐) */
+export const radioMessages = pgTable(
+  "radio_messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    lat: doublePrecision("lat").notNull(),
+    lng: doublePrecision("lng").notNull(),
+    text: text("text").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("radio_created_idx").on(t.createdAt)],
 );
