@@ -1,36 +1,30 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 주차해적단
 
-## Getting Started
+차단기 없는 아파트 단지를 회원끼리 공유하는 초대제 지도 웹앱(PWA). 자세한 기획은 [CLAUDE.md](CLAUDE.md).
 
-First, run the development server:
+## 처음 설정
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+1. `.env.example`을 복사해 `.env.local`을 만들고 값을 채운다.
+   - `AUTH_SECRET`: `node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"`
+2. 패키지 설치: `npm install`
+3. 테이블 생성: `npm run db:push`
+4. 최초 관리자 만들기: `npm run seed:admin -- <닉네임> <비밀번호>`
+5. 개발 서버: `npm run dev` → http://localhost:3000
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+카카오 개발자 콘솔 > 앱 > 플랫폼 > Web 사이트 도메인에 `http://localhost:3000`과 Vercel 도메인을 등록해야 지도가 뜬다.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 스크립트
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| 명령 | 설명 |
+|---|---|
+| `npm run dev` | 개발 서버 |
+| `npm run build` | 프로덕션 빌드 |
+| `npm run lint` | ESLint |
+| `npm run db:push` | Drizzle 스키마를 Neon DB에 반영 |
+| `npm run db:studio` | DB 브라우저 |
+| `npm run seed:admin -- 닉네임 비밀번호` | 최초 관리자 생성 |
 
-## Learn More
+## 참고
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Next.js 16에서는 `middleware.ts`가 `proxy.ts`로 이름이 바뀌었다. 로그인 확인은 [proxy.ts](proxy.ts)에서 한다.
+- 휴대폰 실기기에서 위치(GPS)는 HTTPS에서만 동작한다. 로컬 테스트는 Vercel 프리뷰 배포로 하는 게 편하다.

@@ -1,0 +1,207 @@
+# 주차해적단
+
+차단기 없는 아파트 단지를 회원끼리 공유하는 초대제 지도 웹앱.
+회원은 20명 내외로 제한하고, 앱스토어 없이 PWA(홈 화면에 추가)로 배포한다.
+
+## 핵심 원칙
+
+- **초대제:** 누구의 추천으로 들어왔는지 확인돼야만 가입할 수 있다. 추천인 없는 가입은 없다(최초 관리자 1명만 예외).
+- **인원 제한:** 전체 회원 수는 `MAX_MEMBERS`(기본 20)를 넘을 수 없다. 가입 시 서버에서 검사한다.
+- **모바일 우선:** 주로 차 안에서 휴대폰으로 쓴다. 한 손 조작, 큰 버튼, 지도 중심 화면.
+- **위치 정보는 최소로:** 회원 위치를 계속 추적하지 않는다. "정박(주차) 시작"을 누를 때의 위치만 확인용으로 쓰고, 정박이 끝나면 좌표는 저장하지 않는다.
+- UI 문구는 전부 한국어.
+
+## 기술 스택
+
+| 영역 | 선택 |
+|---|---|
+| 프레임워크 | Next.js (App Router) + TypeScript |
+| 배포 | Vercel |
+| DB | Neon Postgres + Drizzle ORM (`@neondatabase/serverless` 드라이버) |
+| 지도 | 카카오맵 JavaScript API |
+| 위치 | 브라우저 Geolocation API (`navigator.geolocation`, HTTPS 필요 → Vercel 기본 제공) |
+| 인증 | 닉네임 + 비밀번호(bcrypt), 세션은 httpOnly 쿠키(JWT, `jose`) |
+| 스타일 | Tailwind CSS |
+| PWA | `app/manifest.ts` + 간단한 service worker |
+| 저장소 | GitHub, main 브랜치 push 시 Vercel 자동 배포 |
+
+외부 유료 서비스는 쓰지 않는다. 실시간 소켓 대신 30초 폴링으로 충분하다(회원 20명 규모).
+
+### 환경 변수 (`.env.local`, Vercel에도 동일하게 등록)
+
+```
+DATABASE_URL=            # Neon 연결 문자열 (pooled)
+AUTH_SECRET=             # JWT 서명용 랜덤 문자열
+NEXT_PUBLIC_KAKAO_MAP_KEY=  # 카카오 개발자 콘솔 JavaScript 키
+MAX_MEMBERS=20
+```
+
+카카오 개발자 콘솔에서 플랫폼 > Web에 `http://localhost:3000`과 Vercel 도메인을 둘 다 등록해야 지도가 뜬다.
+
+## 용어 (해적 테마)
+
+화면 문구는 이 용어를 쓴다. 코드(테이블·변수명)는 영어로 쓴다.
+
+| 화면 용어 | 의미 | 코드 이름 |
+|---|---|---|
+| 선원 | 회원 | `users` |
+| 승선권 | 초대 코드 | `invites` |
+| 정박지 | 주차 포인트(차단기 없는 단지) | `spots` |
+| 정박 | 주차 체크인 | `parkings` |
+| 경계 레벨 | 경비원 경계 수위 (1~5) | `guard_level` |
+| 항해 일지 | 정박지에 남기는 현장 정보 | `spot_reports` |
+
+## 데이터 모델
+
+```
+users
+  id              uuid pk
+  nickname        text unique not null
+  password_hash   text not null
+  referrer_id     uuid fk -> users.id   (최초 관리자만 null)
+  role            text  'admin' | 'member'
+  status          text  'active' | 'banned'
+  created_at      timestamptz
+
+invites
+  code            text pk           (8자리 랜덤, 예: K7Q2-M9XP)
+  created_by      uuid fk -> users.id
+  used_by         uuid fk -> users.id null
+  expires_at      timestamptz       (생성 후 7일)
+  used_at         timestamptz null
+
+spots
+  id              uuid pk
+  name            text not null     (아파트 단지명)
+  address         text
+  lat, lng        double precision not null
+  created_by      uuid fk -> users.id   (첫 발견자)
+  status          text  'open' | 'closed'   (차단기 생기면 closed)
+  last_confirmed_at timestamptz     (마지막으로 "아직 차단기 없음" 확인된 시각)
+  created_at      timestamptz
+
+spot_reports
+  id              uuid pk
+  spot_id         uuid fk -> spots.id
+  user_id         uuid fk -> users.id
+  guard_level     int  1~5 null     (1: 무관심 ~ 5: 매우 엄격)
+  gate_status     text 'no_gate' | 'gate_installed' null
+  note            text              (최대 200자)
+  created_at      timestamptz
+
+parkings
+  id              uuid pk
+  user_id         uuid fk -> users.id
+  spot_id         uuid fk -> spots.id
+  started_at      timestamptz
+  ended_at        timestamptz null  (null이면 정박 중)
+```
+
+규칙:
+- 한 선원은 동시에 하나의 정박만 할 수 있다.
+- 정박 중인 기록은 시작 후 12시간이 지나면 자동 종료로 본다(조회 시 `started_at > now() - 12h` 조건).
+- 정박지의 "현재 정박 인원" = 해당 spot의 `ended_at is null` 이고 12시간 이내인 parkings 수.
+- 정박지 경계 레벨 표시값 = 최근 14일 spot_reports의 guard_level 평균(없으면 "정보 없음").
+- `gate_status = 'gate_installed'` 리포트가 2건 이상 쌓이면 spot을 `closed`로 바꾼다.
+
+## 기능
+
+### 1. 가입과 로그인
+- `/join?code=XXXX`: 승선권 코드 확인 → 추천인 닉네임을 화면에 보여줌("○○님의 추천으로 승선합니다") → 닉네임·비밀번호 입력 → 가입.
+- 코드가 없거나, 만료됐거나, 이미 쓰였거나, 회원 수가 `MAX_MEMBERS`에 도달했으면 가입 불가. 각각 다른 안내 문구.
+- 가입과 승선권 사용 처리는 한 트랜잭션으로.
+- 선원은 내 정보 화면에서 승선권을 발급할 수 있다(동시에 미사용 승선권 최대 2개).
+- 최초 관리자는 `scripts/seed-admin.ts`로 만든다.
+- 로그인하지 않으면 `/join`, `/login` 외 모든 화면 접근 불가(`proxy.ts`, 구 middleware).
+
+### 2. 지도 (메인 화면 `/`)
+- 카카오맵 전체 화면, 내 위치로 시작.
+- 정박지마다 핀 표시. 핀에 현재 정박 인원 숫자 배지. 경계 레벨에 따라 핀 색상(낮음 초록 → 높음 빨강). closed는 회색.
+- 핀 탭 → 하단 시트: 단지명, 현재 정박 인원, 경계 레벨, 마지막 확인 시각, 최근 항해 일지 3개, [정박 시작] [일지 쓰기] 버튼.
+- 30초마다 핀 데이터 갱신.
+
+### 3. 정박지 등록
+- 지도 길게 누르기 또는 [+ 정박지 등록] 버튼 → 위치 핀 → 단지명 입력 → 등록.
+- 카카오 주소 변환(geocoder)으로 주소 자동 채우기.
+- 같은 위치 반경 100m 안에 이미 정박지가 있으면 "이미 등록된 정박지가 있어요" 안내 후 그쪽으로 이동.
+
+### 4. 정박 (GPS 체크인)
+- [정박 시작] → 현재 위치 받아서 정박지와 거리 계산(하버사인). 300m 이내일 때만 시작 가능.
+- 정박 중이면 화면 상단에 "○○단지 정박 중 · 1시간 12분" 배너와 [출항(종료)] 버튼.
+- 웹앱은 백그라운드 GPS가 안 되므로 자동 감지는 하지 않는다. 시작과 종료는 버튼으로, 깜빡해도 12시간 후 자동 종료.
+
+### 5. 항해 일지 (현장 정보 공유)
+- 경계 레벨(1~5 선택), 차단기 상태(그대로 없음 / 생겼음), 메모(200자).
+- "그대로 없음"으로 쓰면 spot의 `last_confirmed_at` 갱신.
+
+### 6. 선원 명부
+- 회원 목록과 추천 관계를 트리로 보여줌(선단 계보). 누가 누구를 데려왔는지 한눈에.
+- 관리자는 선원 추방(banned) 가능. 추방된 선원의 미사용 승선권은 무효.
+
+## 재미 요소 (2단계, 기본 기능 완성 후)
+
+- **발견자 깃발:** 정박지 하단 시트에 첫 발견자 닉네임과 "☠ 발견" 표시.
+- **해적 랭킹:** 이번 달 발견왕(정박지 등록 수), 정찰왕(항해 일지 수), 단골 선원(정박 횟수).
+- **칭호:** 정박지 1개 등록 "견습 해적", 5개 "갑판장", 10개 "선장" 같은 단계별 칭호를 닉네임 옆에 표시.
+- **신선도 표시:** 마지막 확인이 오래된 정박지는 핀이 흐려지게(7일 이상 반투명). 정보를 갱신하는 동기가 된다.
+
+## 화면 목록
+
+```
+/login            로그인
+/join             승선권으로 가입
+/                 지도 (메인)
+/spots/new        정박지 등록 (모달로 처리해도 됨)
+/me               내 정보, 승선권 발급, 내 정박 기록
+/crew             선원 명부(추천 트리), 랭킹
+```
+
+## 폴더 구조
+
+```
+app/
+  (auth)/login, (auth)/join
+  (main)/page.tsx, (main)/me, (main)/crew
+  api/            route handlers (spots, parkings, reports, invites, auth)
+  manifest.ts
+components/       Map, SpotSheet, ParkingBanner, ...
+db/
+  schema.ts       Drizzle 스키마
+  index.ts        Neon 연결
+lib/
+  auth.ts         세션 발급·검증
+  geo.ts          하버사인 거리 계산
+scripts/
+  seed-admin.ts
+proxy.ts          로그인 확인 (Next 16: middleware → proxy 로 이름 변경)
+drizzle.config.ts
+```
+
+## 작업 순서
+
+각 단계가 끝나면 로컬에서 동작 확인 후 커밋한다.
+
+1. Next.js + TypeScript + Tailwind 프로젝트 생성, GitHub 연결, Vercel 배포 확인
+2. Neon 연결, Drizzle 스키마 작성, `drizzle-kit push`로 테이블 생성
+3. 인증: 관리자 시드 스크립트, 로그인, middleware, 승선권 발급·가입 (인원 제한 포함)
+4. 카카오맵 메인 화면, 내 위치 표시
+5. 정박지 등록과 핀 표시
+6. 정박 시작·종료, 핀 정박 인원 배지
+7. 항해 일지, 경계 레벨 평균, 차단기 생김 처리
+8. 선원 명부(추천 트리)
+9. PWA 설정(아이콘, manifest, 홈 화면 추가 안내)
+10. 재미 요소
+
+## 완료 기준
+
+- 승선권 없이는 가입이 안 되고, 21번째 가입 시도는 막힌다.
+- 다른 휴대폰 두 대로 같은 정박지에 정박하면 핀 배지가 2로 바뀐다(30초 이내).
+- 정박지에서 300m 밖에서는 정박 시작이 안 된다.
+- iPhone Safari와 Android Chrome에서 홈 화면에 추가 후 앱처럼 열린다.
+
+## 코드 규칙
+
+- 서버에서 모든 권한·인원 제한 검사를 한다. 클라이언트 검사는 편의용일 뿐.
+- DB 접근은 route handler 또는 server action에서만.
+- 비밀번호와 세션 비밀값은 절대 커밋하지 않는다(`.env*`는 `.gitignore`).
+- 커밋 메시지는 한국어로 짧게.
