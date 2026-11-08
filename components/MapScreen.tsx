@@ -11,7 +11,9 @@ import ReportSheet from "./ReportSheet";
 import SpotSheet from "./SpotSheet";
 
 const POLL_MS = 30_000;
-const DEFAULT_CENTER: LatLng = { lat: 37.5665, lng: 126.978 }; // 서울시청 (위치 권한 없을 때)
+// 여의도 위주로 쓰므로 지도는 여의도에서 시작한다 (내 위치는 🎯 버튼으로 이동)
+const START_CENTER: LatLng = { lat: 37.5255, lng: 126.9245 };
+const START_LEVEL = 6; // 여의도 섬 전체가 보이는 정도
 
 type Mode =
   | { kind: "idle" }
@@ -68,12 +70,12 @@ export default function MapScreen() {
   }, [refresh]);
 
   const locateMe = useCallback(
-    async (silent = false) => {
+    async (silent = false, pan = true) => {
       setLocating(true);
       try {
         const p = await getPosition(false);
         mapRef.current?.setMyLocation(p);
-        mapRef.current?.panTo(p);
+        if (pan) mapRef.current?.panTo(p);
       } catch (e) {
         if (!silent) showToast((e as Error).message);
       } finally {
@@ -122,7 +124,8 @@ export default function MapScreen() {
     <div className="relative h-full w-full overflow-hidden">
       <KakaoMap
         ref={mapRef}
-        initialCenter={DEFAULT_CENTER}
+        initialCenter={START_CENTER}
+        initialLevel={START_LEVEL}
         spots={spots}
         selectedId={selectedId}
         onSpotTap={(id) => {
@@ -135,7 +138,7 @@ export default function MapScreen() {
         }}
         onReady={(k) => {
           setKakao(k);
-          void locateMe(true);
+          void locateMe(true, false); // 내 위치 점만 표시하고 화면은 여의도 유지
         }}
       />
 

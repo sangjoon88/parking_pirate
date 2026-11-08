@@ -17,6 +17,7 @@ export type KakaoMapHandle = {
 type Props = {
   ref?: Ref<KakaoMapHandle>;
   initialCenter: LatLng;
+  initialLevel?: number;
   spots: SpotSummary[];
   selectedId: string | null;
   onSpotTap: (id: string) => void;
@@ -46,7 +47,7 @@ function pinHtml(s: SpotSummary, selected: boolean) {
     </div>`;
 }
 
-export default function KakaoMap({ ref, initialCenter, spots, selectedId, onSpotTap, onLongPress, onReady }: Props) {
+export default function KakaoMap({ ref, initialCenter, initialLevel = 4, spots, selectedId, onSpotTap, onLongPress, onReady }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const kakaoRef = useRef<Kakao | null>(null);
   const mapRef = useRef<any>(null);
@@ -148,7 +149,7 @@ export default function KakaoMap({ ref, initialCenter, spots, selectedId, onSpot
         kakaoRef.current = kakao;
         const map = new kakao.maps.Map(container, {
           center: new kakao.maps.LatLng(initialCenter.lat, initialCenter.lng),
-          level: 4,
+          level: initialLevel,
         });
         mapRef.current = map;
         // 데스크톱: 오른쪽 클릭으로 등록
