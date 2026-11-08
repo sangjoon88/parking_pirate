@@ -1,9 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/PageHeader";
 import { ErrorText } from "@/components/ui";
 import { api } from "@/lib/api";
+import { REWARD } from "@/lib/game";
+import type { SpotSummary } from "@/lib/types";
+import { exploredCells, YEOUIDO_CELLS } from "@/lib/yeouido";
 
 type Member = {
   id: string;
@@ -12,19 +16,35 @@ type Member = {
   role: "admin" | "member";
   status: "active" | "banned";
   createdAt: string;
+  title: string;
+  doubloons: number;
+  isKing: boolean;
 };
 
+type Entry = { userId: string; nickname: string; score: number };
+type Rankings = { gold: Entry[]; discover: Entry[]; scout: Entry[]; regular: Entry[] };
+type Tab = "tree" | "rank" | "chart";
+
 export default function CrewScreen() {
+  const [tab, setTab] = useState<Tab>("tree");
   const [crew, setCrew] = useState<Member[]>([]);
   const [me, setMe] = useState<{ id: string; role: string } | null>(null);
+  const [rankings, setRankings] = useState<Rankings | null>(null);
+  const [spots, setSpots] = useState<SpotSummary[] | null>(null);
   const [error, setError] = useState("");
 
   const load = useCallback(
     () =>
-      api<{ me: { id: string; role: string }; crew: Member[] }>("/api/crew")
-        .then((d) => {
-          setCrew(d.crew);
-          setMe(d.me);
+      Promise.all([
+        api<{ me: { id: string; role: string }; crew: Member[] }>("/api/crew"),
+        api<Rankings>("/api/rankings"),
+        api<{ spots: SpotSummary[] }>("/api/spots"),
+      ])
+        .then(([c, r, s]) => {
+          setCrew(c.crew);
+          setMe(c.me);
+          setRankings(r);
+          setSpots(s.spots);
         })
         .catch((e: Error) => setError(e.message)),
     [],
@@ -51,7 +71,12 @@ export default function CrewScreen() {
   }, [crew]);
 
   async function ban(m: Member) {
-    if (!confirm(`${m.nickname}님을 추방할까요?\n미사용 승선권도 함께 무효가 됩니다.`)) return;
+    if (
+      !confirm(
+        `${m.nickname}님을 추방할까요?\n미사용 승선권은 무효가 되고, 추천인은 ${-REWARD.banPenalty}두블룬이 깎입니다.`,
+      )
+    )
+      return;
     try {
       await api(`/api/crew/${m.id}/ban`, { method: "POST" });
       await load();
@@ -61,21 +86,127 @@ export default function CrewScreen() {
   }
 
   const active = crew.filter((c) => c.status === "active").length;
+  const kingIds = new Set(crew.filter((c) => c.isKing).map((c) => c.id));
 
   return (
     <div className="pb-8">
       <PageHeader title="선원 명부" right={<span className="text-sm text-slate-400">선원 {active}명</span>} />
       <div className="px-5">
-        <ErrorText>{error}</ErrorText>
-        <h2 className="mt-2 mb-1 font-bold">선단 계보</h2>
-        <p className="mb-3 text-xs text-slate-400">누가 누구를 데려왔는지 보여줘요.</p>
-        <ul className="rounded-2xl bg-sea-800 px-4 py-2">
-          {roots.map((r) => (
-            <Node key={r.id} m={r} depth={0} ctx={{ childrenOf: children, me, onBan: ban }} />
+        <div className="mb-4 grid grid-cols-3 rounded-xl bg-sea-800 p-1 text-sm font-bold">
+          {(
+            [
+              ["tree", "선단 계보"],
+              ["rank", "해적 랭킹"],
+              ["chart", "여의도 해도"],
+            ] as [Tab, string][]
+          ).map(([k, label]) => (
+            <button
+              key={k}
+              onClick={() => setTab(k)}
+              className={`h-10 rounded-lg ${tab === k ? "bg-gold-400 text-sea-950" : "text-slate-300"}`}
+            >
+              {label}
+            </button>
           ))}
-        </ul>
+        </div>
+        <ErrorText>{error}</ErrorText>
+
+        {tab === "tree" && (
+          <>
+            <p className="mb-3 text-xs text-slate-400">
+              누가 누구를 데려왔는지 보여줘요. 데려온 선원이 금화를 벌면 추천인도 10%를 받아요.
+            </p>
+            <ul className="rounded-2xl bg-sea-800 px-4 py-2">
+              {roots.map((r) => (
+                <Node key={r.id} m={r} depth={0} ctx={{ childrenOf: children, me, onBan: ban }} />
+              ))}
+            </ul>
+          </>
+        )}
+
+        {tab === "rank" && rankings && (
+          <div className="space-y-4">
+            <p className="text-xs text-slate-400">이번 달 기록이에요. 매달 1일에 새로 시작해요.</p>
+            <Board title="💰 금화왕 (이달의 해적왕)" unit="두블룬" entries={rankings.gold} kingIds={kingIds} highlight />
+            <Board title="🚩 발견왕" unit="곳" entries={rankings.discover} kingIds={kingIds} />
+            <Board title="🔭 정찰왕" unit="개" entries={rankings.scout} kingIds={kingIds} />
+            <Board title="⚓ 단골 선원" unit="회" entries={rankings.regular} kingIds={kingIds} />
+          </div>
+        )}
+
+        {tab === "chart" && spots && <ChartPanel spots={spots} />}
       </div>
     </div>
+  );
+}
+
+function ChartPanel({ spots }: { spots: SpotSummary[] }) {
+  const explored = exploredCells(spots);
+  const total = YEOUIDO_CELLS.length;
+  const pct = Math.round((explored.size / total) * 100);
+  return (
+    <div className="space-y-4">
+      <section className="rounded-2xl bg-sea-800 p-4 text-center">
+        <div className="text-sm text-slate-400">선단 공동 목표</div>
+        <div className="mt-1 text-4xl font-black text-gold-400">{pct}%</div>
+        <div className="mt-1 text-sm">
+          여의도 {total}개 해역 중 <b>{explored.size}</b>곳을 밝혔어요
+        </div>
+        <div className="mt-3 h-3 overflow-hidden rounded-full bg-sea-700">
+          <div className="h-full bg-gold-400 transition-all" style={{ width: `${pct}%` }} />
+        </div>
+      </section>
+      <p className="text-sm text-slate-300">
+        여의도를 약 250m 칸으로 나눴어요. 아직 아무도 정박지를 찾지 못한 칸에 새 정박지를 등록하면{" "}
+        <b className="text-gold-400">+{REWARD.newCell} 두블룬</b> 보너스와 &lsquo;해도 개척자&rsquo; 배지를 받아요.
+      </p>
+      <Link
+        href="/?fog=1"
+        className="flex min-h-12 items-center justify-center rounded-xl bg-gold-400 font-bold text-sea-950"
+      >
+        🗺️ 지도에서 해도 보기
+      </Link>
+    </div>
+  );
+}
+
+function Board({
+  title,
+  unit,
+  entries,
+  kingIds,
+  highlight,
+}: {
+  title: string;
+  unit: string;
+  entries: Entry[];
+  kingIds: Set<string>;
+  highlight?: boolean;
+}) {
+  const medals = ["🥇", "🥈", "🥉"];
+  return (
+    <section className={`rounded-2xl p-4 ${highlight ? "border border-gold-400/40 bg-gold-400/10" : "bg-sea-800"}`}>
+      <h3 className="mb-2 font-bold">{title}</h3>
+      {entries.length === 0 ? (
+        <p className="text-sm text-slate-500">아직 기록이 없어요. 첫 번째가 되어 보세요!</p>
+      ) : (
+        <ol className="space-y-1">
+          {entries.map((e, i) => (
+            <li key={e.userId} className="flex items-center gap-2 text-sm">
+              <span className="w-6 text-center">{medals[i] ?? i + 1}</span>
+              <span className="flex-1 font-semibold">
+                {kingIds.has(e.userId) && "👑 "}
+                {e.nickname}
+              </span>
+              <span className="text-slate-300">
+                {e.score.toLocaleString()}
+                {unit}
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
   );
 }
 
@@ -89,15 +220,24 @@ function Node({ m, depth, ctx }: { m: Member; depth: number; ctx: Ctx }) {
     <li>
       <div className="flex items-center gap-2 py-1.5" style={{ paddingLeft: depth * 18 }}>
         {depth > 0 && <span className="text-sea-600">└</span>}
-        <span className={`font-semibold ${banned ? "text-slate-500 line-through" : ""}`}>
-          {m.role === "admin" ? "👑 " : "☠ "}
-          {m.nickname}
-        </span>
-        {m.id === me?.id && <span className="rounded bg-gold-400/20 px-1.5 text-[11px] text-gold-400">나</span>}
-        {banned && <span className="text-xs text-red-400">추방됨</span>}
-        {kids.length > 0 && <span className="text-xs text-slate-500">+{kids.length}</span>}
+        <div className="min-w-0">
+          <div className={`truncate font-semibold ${banned ? "text-slate-500 line-through" : ""}`}>
+            {m.isKing ? "👑 " : m.role === "admin" ? "🏴‍☠️ " : "☠ "}
+            {m.nickname}
+            {m.id === me?.id && (
+              <span className="ml-1.5 rounded bg-gold-400/20 px-1.5 text-[11px] text-gold-400">나</span>
+            )}
+          </div>
+          <div className="text-[11px] text-slate-400">
+            {banned ? <span className="text-red-400">추방됨</span> : m.title} · 💰{m.doubloons}
+            {kids.length > 0 && ` · 데려온 선원 ${kids.length}`}
+          </div>
+        </div>
         {me?.role === "admin" && !banned && m.role !== "admin" && (
-          <button onClick={() => onBan(m)} className="ml-auto h-8 rounded-lg px-2 text-xs text-red-400 active:bg-red-950">
+          <button
+            onClick={() => onBan(m)}
+            className="ml-auto h-8 shrink-0 rounded-lg px-2 text-xs text-red-400 active:bg-red-950"
+          >
             추방
           </button>
         )}

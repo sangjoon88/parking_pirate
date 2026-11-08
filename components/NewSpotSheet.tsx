@@ -18,7 +18,7 @@ export default function NewSpotSheet({
   kakao: Kakao | null;
   position: LatLng;
   onClose: () => void;
-  onCreated: (id: string) => void;
+  onCreated: (id: string, earned: number, newCell: boolean) => void;
   onDuplicate: (existing: ExistingSpot) => void;
 }) {
   const [name, setName] = useState("");
@@ -46,11 +46,11 @@ export default function NewSpotSheet({
     setBusy(true);
     setError("");
     try {
-      const res = await api<{ id: string }>("/api/spots", {
+      const res = await api<{ id: string; earned: number; newCell: boolean }>("/api/spots", {
         method: "POST",
         json: { name, address, lat: position.lat, lng: position.lng },
       });
-      onCreated(res.id);
+      onCreated(res.id, res.earned, res.newCell);
     } catch (err) {
       if (err instanceof ApiError && err.status === 409 && err.data.existing) {
         alert("이미 등록된 정박지가 있어요. 그쪽으로 이동할게요.");

@@ -3,8 +3,11 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { parkings, spots } from "@/db/schema";
 import { bad, handle, readJson, requireUser } from "@/lib/auth";
+import { PARKING_MAX_HOURS } from "@/lib/constants";
+import { award, awardedRecently } from "@/lib/doubloons";
+import { FLEET_SIZE, PARKING_REWARD_COOLDOWN_HOURS, REWARD } from "@/lib/game";
 import { distanceMeters, isValidCoord, PARKING_RADIUS_M } from "@/lib/geo";
-import { closeStaleParkings, getActiveParking } from "@/lib/parking";
+import { activeParkersAt, closeStaleParkings, getActiveParking } from "@/lib/parking";
 
 /** 정박 시작. 좌표는 거리 확인에만 쓰고 저장하지 않는다. */
 export const POST = handle(async (req: Request) => {
@@ -33,5 +36,26 @@ export const POST = handle(async (req: Request) => {
     // 동시 요청으로 유니크 인덱스(한 사람당 하나) 위반
     bad("이미 정박 중이에요.", 409);
   }
-  return NextResponse.json({ parking: await getActiveParking(user.id) }, { status: 201 });
+
+  // 정박 보상: 짧은 시간에 반복 정박해서 버는 것 방지
+  let earned = 0;
+  if (!(await awardedRecently(user.id, "parking", PARKING_REWARD_COOLDOWN_HOURS))) {
+    await award(user.id, REWARD.parking, "parking", spot.id);
+    earned += REWARD.parking;
+  }
+
+  // 함대 집결: 3명 이상 모이면 그 자리의 모두에게 (같은 정박지에서 12시간에 한 번)
+  let fleet = false;
+  const parkers = await activeParkersAt(spot.id);
+  if (parkers.length >= FLEET_SIZE) {
+    fleet = true;
+    for (const uid of parkers) {
+      if (!(await awardedRecently(uid, "fleet", PARKING_MAX_HOURS, spot.id))) {
+        await award(uid, REWARD.fleet, "fleet", spot.id);
+        if (uid === user.id) earned += REWARD.fleet;
+      }
+    }
+  }
+
+  return NextResponse.json({ parking: await getActiveParking(user.id), earned, fleet }, { status: 201 });
 });

@@ -5,7 +5,9 @@ import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "reac
 import { guardColor } from "@/lib/format";
 import { loadKakao, type Kakao, type LatLng } from "@/lib/kakao";
 import { STALE_DAYS } from "@/lib/constants";
+import { FLEET_SIZE } from "@/lib/game";
 import type { SpotSummary } from "@/lib/types";
+import { YEOUIDO_CELLS } from "@/lib/yeouido";
 
 export type KakaoMapHandle = {
   kakao: Kakao | null;
@@ -23,6 +25,8 @@ type Props = {
   onSpotTap: (id: string) => void;
   onLongPress: (p: LatLng) => void;
   onReady?: (kakao: Kakao) => void;
+  /** 해도 모드: 밝혀진 해역 칸 id 목록. null이면 해도를 그리지 않는다 */
+  fogExplored?: Set<string> | null;
 };
 
 const LONG_PRESS_MS = 600;
@@ -34,20 +38,38 @@ function pinHtml(s: SpotSummary, selected: boolean) {
     (!s.lastConfirmedAt || Date.now() - new Date(s.lastConfirmedAt).getTime() > STALE_DAYS * 86400_000);
   const color = guardColor(s.guardAvg, closed);
   const scale = selected ? 1.25 : 1;
-  const badge =
-    s.parkedCount > 0
-      ? `<span style="position:absolute;top:-6px;right:-8px;min-width:20px;height:20px;padding:0 5px;border-radius:10px;background:#f5c451;color:#07111f;font:800 12px/20px sans-serif;text-align:center;border:2px solid #07111f">${s.parkedCount}</span>`
-      : "";
+  const fleet = s.parkedCount >= FLEET_SIZE;
+  const icon = closed ? "🚧" : fleet ? "⛵" : "☠";
+  const tag = (pos: string, bg: string, fg: string, text: string, extra = "") =>
+    `<span style="position:absolute;${pos};height:20px;padding:0 6px;border-radius:10px;background:${bg};color:${fg};font:800 11px/20px sans-serif;white-space:nowrap;border:2px solid #07111f;${extra}">${text}</span>`;
+  const count = s.parkedCount > 0 ? tag("top:-6px;right:-10px", "#f5c451", "#07111f", String(s.parkedCount)) : "";
+  const bounty = s.bounty > 0 ? tag("bottom:-8px;left:50%;transform:translateX(-50%)", "#16a34a", "#fff", `💰${s.bounty}`) : "";
+  const crown = s.discovererIsKing ? `<span style="position:absolute;top:-14px;left:2px;font-size:16px">👑</span>` : "";
+  const navy = s.navyAlert
+    ? tag("top:-6px;left:-12px", "#dc2626", "#fff", "⚠", "animation:pp-blink 1s steps(2) infinite")
+    : "";
+  // 오래 확인 안 된 핀은 흐리게 (현상금 표시는 또렷하게 유지)
   return `
-    <div data-spot="${s.id}" style="position:relative;transform:translateY(-50%) scale(${scale});transform-origin:bottom center;opacity:${stale ? 0.45 : 1};cursor:pointer;padding:6px">
-      <div style="width:34px;height:34px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:${color};border:3px solid ${selected ? "#f5c451" : "#fff"};box-shadow:0 2px 6px rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center">
-        <span style="transform:rotate(45deg);font-size:16px;line-height:1">${closed ? "🚧" : "☠"}</span>
+    <div data-spot="${s.id}" style="position:relative;transform:translateY(-50%) scale(${scale});transform-origin:bottom center;cursor:pointer;padding:8px">
+      <div style="opacity:${stale ? 0.45 : 1};width:34px;height:34px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:${color};border:3px solid ${selected ? "#f5c451" : "#fff"};box-shadow:0 2px 6px rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center">
+        <span style="transform:rotate(45deg);font-size:16px;line-height:1">${icon}</span>
       </div>
-      ${badge}
+      ${crown}${count}${navy}${bounty}
     </div>`;
 }
 
-export default function KakaoMap({ ref, initialCenter, initialLevel = 4, spots, selectedId, onSpotTap, onLongPress, onReady }: Props) {
+export default function KakaoMap({
+  ref,
+  initialCenter,
+  initialLevel = 4,
+  spots,
+  selectedId,
+  onSpotTap,
+  onLongPress,
+  onReady,
+  fogExplored = null,
+}: Props) {
+  const fogRef = useRef<any[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
   const kakaoRef = useRef<Kakao | null>(null);
   const mapRef = useRef<any>(null);
@@ -198,6 +220,32 @@ export default function KakaoMap({ ref, initialCenter, initialLevel = 4, spots, 
       return overlay;
     });
   }, [ready, spots, selectedId]);
+
+  // 해도(안개) 그리기: 안 밝혀진 칸은 어둡게, 밝혀진 칸은 금색 테두리
+  useEffect(() => {
+    const map = mapRef.current;
+    const kakao = kakaoRef.current;
+    if (!ready || !map || !kakao) return;
+    fogRef.current.forEach((r) => r.setMap(null));
+    fogRef.current = [];
+    if (!fogExplored) return;
+    fogRef.current = YEOUIDO_CELLS.map((c) => {
+      const lit = fogExplored.has(c.id);
+      const rect = new kakao.maps.Rectangle({
+        bounds: new kakao.maps.LatLngBounds(
+          new kakao.maps.LatLng(c.south, c.west),
+          new kakao.maps.LatLng(c.north, c.east),
+        ),
+        strokeWeight: 1,
+        strokeColor: lit ? "#f5c451" : "#07111f",
+        strokeOpacity: lit ? 0.9 : 0.4,
+        fillColor: lit ? "#f5c451" : "#07111f",
+        fillOpacity: lit ? 0.12 : 0.55,
+      });
+      rect.setMap(map);
+      return rect;
+    });
+  }, [ready, fogExplored]);
 
   return (
     <div className="absolute inset-0">

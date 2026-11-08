@@ -10,11 +10,32 @@ import { dateTime, duration } from "@/lib/format";
 type Me = { id: string; nickname: string; role: "admin" | "member"; createdAt: string };
 type Invite = { code: string; expiresAt: string; usedAt: string | null; usedBy: string | null };
 type History = { id: string; spotName: string; startedAt: string; endedAt: string | null };
+type Badge = { id: string; icon: string; name: string; desc: string; earned: boolean; progress: string };
+type GameInfo = {
+  doubloons: { total: number; month: number; logs: { id: string; amount: number; reason: string; createdAt: string }[] };
+  title: string;
+  nextTitle: { title: string; need: number } | null;
+  discoveries: number;
+  isKing: boolean;
+  badges: Badge[];
+};
+
+const REASON_LABEL: Record<string, string> = {
+  discovery: "정박지 발견",
+  new_cell: "새 해역 개척",
+  report: "항해 일지",
+  parking: "정박",
+  bounty: "현상금",
+  fleet: "함대 집결",
+  lineage: "데려온 선원의 활약",
+  lineage_ban: "데려온 선원 추방",
+};
 
 export default function MeScreen() {
   const [me, setMe] = useState<Me | null>(null);
   const [history, setHistory] = useState<History[]>([]);
   const [invites, setInvites] = useState<Invite[]>([]);
+  const [game, setGame] = useState<GameInfo | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -23,11 +44,12 @@ export default function MeScreen() {
   const load = useCallback(
     () =>
       Promise.all([
-        api<{ user: Me; history: History[] }>("/api/me"),
+        api<{ user: Me; history: History[] } & GameInfo>("/api/me"),
         api<{ invites: Invite[] }>("/api/invites"),
       ])
         .then(([m, i]) => {
           setMe(m.user);
+          setGame(m);
           setHistory(m.history);
           setInvites(i.invites);
         })
@@ -89,10 +111,84 @@ export default function MeScreen() {
       <div className="space-y-6 px-5">
         {me && (
           <section className="rounded-2xl bg-sea-800 p-4">
-            <div className="text-2xl font-black">{me.nickname}</div>
-            <div className="mt-1 text-sm text-slate-400">
-              {me.role === "admin" ? "👑 선장(관리자)" : "선원"} · {new Date(me.createdAt).toLocaleDateString("ko-KR")} 승선
+            {game && <div className="text-sm font-bold text-gold-400">{game.title}</div>}
+            <div className="text-2xl font-black">
+              {game?.isKing && "👑 "}
+              {me.nickname}
             </div>
+            <div className="mt-1 text-sm text-slate-400">
+              {me.role === "admin" ? "🏴‍☠️ 선단장(관리자)" : "선원"} · {new Date(me.createdAt).toLocaleDateString("ko-KR")}{" "}
+              승선
+            </div>
+            {game?.isKing && <div className="mt-2 text-sm font-bold text-gold-400">이달의 해적왕입니다!</div>}
+            {game && (
+              <div className="mt-3 grid grid-cols-2 gap-2 text-center">
+                <div className="rounded-xl bg-sea-900 py-2">
+                  <div className="text-xs text-slate-400">보유 두블룬</div>
+                  <div className="text-xl font-black text-gold-400">💰 {game.doubloons.total}</div>
+                </div>
+                <div className="rounded-xl bg-sea-900 py-2">
+                  <div className="text-xs text-slate-400">이번 달</div>
+                  <div className="text-xl font-black">+{game.doubloons.month}</div>
+                </div>
+              </div>
+            )}
+            {game?.nextTitle && (
+              <p className="mt-2 text-xs text-slate-400">
+                정박지 {game.nextTitle.need}곳을 더 발견하면 &lsquo;{game.nextTitle.title}&rsquo; 칭호
+              </p>
+            )}
+          </section>
+        )}
+
+        {game && (
+          <section>
+            <h2 className="mb-2 font-bold">
+              배지 <span className="text-sm font-normal text-slate-400">{game.badges.filter((b) => b.earned).length}/{game.badges.length}</span>
+            </h2>
+            <ul className="grid grid-cols-4 gap-2">
+              {game.badges.map((b) => (
+                <li
+                  key={b.id}
+                  className={`flex flex-col items-center rounded-xl bg-sea-800 px-1 py-2 text-center ${b.earned ? "" : "opacity-40 grayscale"}`}
+                  title={b.desc}
+                >
+                  <span className="text-2xl">{b.icon}</span>
+                  <span className="mt-1 text-[11px] leading-tight font-bold">{b.name}</span>
+                  <span className="text-[10px] text-slate-400">{b.earned ? "획득" : b.progress}</span>
+                </li>
+              ))}
+            </ul>
+            <details className="mt-2 text-xs text-slate-400">
+              <summary className="cursor-pointer">배지 얻는 법</summary>
+              <ul className="mt-1 space-y-0.5">
+                {game.badges.map((b) => (
+                  <li key={b.id}>
+                    {b.icon} {b.name}: {b.desc}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          </section>
+        )}
+
+        {game && game.doubloons.logs.length > 0 && (
+          <section>
+            <h2 className="mb-2 font-bold">금화 장부</h2>
+            <ul className="divide-y divide-sea-700 rounded-xl bg-sea-800">
+              {game.doubloons.logs.map((l) => (
+                <li key={l.id} className="flex items-center justify-between px-4 py-2.5 text-sm">
+                  <div>
+                    <div>{REASON_LABEL[l.reason] ?? l.reason}</div>
+                    <div className="text-xs text-slate-400">{dateTime(l.createdAt)}</div>
+                  </div>
+                  <div className={`font-bold ${l.amount < 0 ? "text-red-400" : "text-gold-400"}`}>
+                    {l.amount > 0 ? "+" : ""}
+                    {l.amount}
+                  </div>
+                </li>
+              ))}
+            </ul>
           </section>
         )}
 

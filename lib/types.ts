@@ -8,8 +8,14 @@ export type SpotSummary = {
   lastConfirmedAt: string | null;
   createdAt: string;
   discoverer: string;
+  /** 발견자가 이달의 해적왕인지 */
+  discovererIsKing: boolean;
   parkedCount: number;
   guardAvg: number | null;
+  /** 현상금(두블룬). 0이면 없음 */
+  bounty: number;
+  /** 최근 30분 안의 경계 레벨 5 제보 */
+  navyAlert: { at: string; by: string } | null;
 };
 
 export type SpotReport = {
@@ -26,4 +32,5 @@ export type ActiveParking = {
   spotId: string;
   spotName: string;
   startedAt: string;
+  navyAlert: { at: string; by: string } | null;
 } | null;

@@ -1,9 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { getPosition, type Kakao, type LatLng } from "@/lib/kakao";
+import { randomFortune } from "@/lib/game";
 import type { ActiveParking, SpotSummary } from "@/lib/types";
+import { exploredCells, YEOUIDO_CELLS } from "@/lib/yeouido";
 import KakaoMap, { type KakaoMapHandle } from "./KakaoMap";
 import NewSpotSheet, { type ExistingSpot } from "./NewSpotSheet";
 import ParkingBanner from "./ParkingBanner";
@@ -21,7 +23,7 @@ type Mode =
   | { kind: "new"; position: LatLng }
   | { kind: "report"; spot: SpotSummary };
 
-export default function MapScreen() {
+export default function MapScreen({ initialFog = false }: { initialFog?: boolean }) {
   const mapRef = useRef<KakaoMapHandle>(null);
   const [spots, setSpots] = useState<SpotSummary[]>([]);
   const [parking, setParking] = useState<ActiveParking>(null);
@@ -32,11 +34,18 @@ export default function MapScreen() {
   const [ending, setEnding] = useState(false);
   const [locating, setLocating] = useState(false);
   const [kakao, setKakao] = useState<Kakao | null>(null);
+  const [fog, setFog] = useState(initialFog);
+  const lastAlertRef = useRef<string | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const showToast = useCallback((msg: string) => {
+  const showToast = useCallback((msg: string, ms = 3500) => {
     setToast(msg);
-    setTimeout(() => setToast(""), 3500);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(""), ms);
   }, []);
+
+  const explored = useMemo(() => exploredCells(spots), [spots]);
+  const fogPercent = Math.round((explored.size / YEOUIDO_CELLS.length) * 100);
 
   const refresh = useCallback(
     () =>
@@ -48,11 +57,18 @@ export default function MapScreen() {
           setSpots(s.spots);
           setParking(p.parking);
           setRefreshKey((k) => k + 1);
+          // 해군 출몰 경보: 내가 정박한 곳에 새 경보가 뜨면 진동 + 알림
+          const alert = p.parking?.navyAlert;
+          if (alert && alert.at !== lastAlertRef.current) {
+            lastAlertRef.current = alert.at;
+            navigator.vibrate?.([200, 100, 200]);
+            showToast(`⚠ 해군 출몰! ${alert.by}님이 경계 5를 제보했어요`, 6000);
+          }
         })
         .catch(() => {
           // 폴링 실패는 조용히 넘어간다
         }),
-    [],
+    [showToast],
   );
 
   // 30초 폴링 + 앱으로 돌아왔을 때 즉시 갱신
@@ -89,12 +105,14 @@ export default function MapScreen() {
     const p = await getPosition(true);
     mapRef.current?.setMyLocation(p);
     // 좌표는 거리 확인용으로만 서버에 보내고, 서버는 저장하지 않는다
-    const res = await api<{ parking: ActiveParking }>("/api/parkings", {
+    const res = await api<{ parking: ActiveParking; earned: number; fleet: boolean }>("/api/parkings", {
       method: "POST",
       json: { spotId: spot.id, lat: p.lat, lng: p.lng },
     });
     setParking(res.parking);
-    showToast(`⚓ ${spot.name}에 정박했어요`);
+    const gold = res.earned > 0 ? ` +${res.earned}💰` : "";
+    const fleet = res.fleet ? "\n⛵ 함대 집결!" : "";
+    showToast(`⚓ ${spot.name}에 정박했어요${gold}${fleet}\n🔮 ${randomFortune()}`, 6000);
     void refresh();
   }
 
@@ -136,6 +154,7 @@ export default function MapScreen() {
           setSelectedId(null);
           setMode({ kind: "new", position });
         }}
+        fogExplored={fog ? explored : null}
         onReady={(k) => {
           setKakao(k);
           void locateMe(true, false); // 내 위치 점만 표시하고 화면은 여의도 유지
@@ -156,6 +175,19 @@ export default function MapScreen() {
               }}
             />
           )}
+          {fog && mode.kind !== "placing" && (
+            <div className="mt-2 rounded-2xl bg-sea-900/95 px-4 py-2 shadow-lg">
+              <div className="flex items-center justify-between text-sm font-bold">
+                <span>🗺️ 여의도 해도</span>
+                <span className="text-gold-400">
+                  {explored.size}/{YEOUIDO_CELLS.length} 해역 · {fogPercent}%
+                </span>
+              </div>
+              <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-sea-700">
+                <div className="h-full bg-gold-400" style={{ width: `${fogPercent}%` }} />
+              </div>
+            </div>
+          )}
           {mode.kind === "placing" && (
             <div className="mt-2 rounded-2xl bg-sea-900/95 px-4 py-3 text-center text-sm font-semibold shadow-lg">
               지도를 움직여 ☠ 표시를 정박지 위에 맞춰 주세요
@@ -173,6 +205,15 @@ export default function MapScreen() {
 
       {/* 하단 조작 버튼 (한 손 조작용으로 오른쪽 아래 모음) */}
       <div className="absolute right-3 bottom-4 z-20 flex flex-col items-end gap-3">
+        <button
+          onClick={() => setFog((f) => !f)}
+          aria-label="해도 보기"
+          className={`flex h-14 w-14 items-center justify-center rounded-full text-2xl shadow-lg ${
+            fog ? "bg-gold-400" : "bg-sea-900 active:bg-sea-700"
+          }`}
+        >
+          🗺️
+        </button>
         <button
           onClick={() => void locateMe()}
           disabled={locating}
@@ -214,7 +255,7 @@ export default function MapScreen() {
 
       {toast && (
         <div className="absolute inset-x-0 bottom-24 z-50 flex justify-center px-6">
-          <div className="rounded-full bg-black/85 px-4 py-2 text-center text-sm">{toast}</div>
+          <div className="rounded-2xl bg-black/85 px-4 py-2 text-center text-sm whitespace-pre-line">{toast}</div>
         </div>
       )}
 
@@ -236,11 +277,14 @@ export default function MapScreen() {
           kakao={kakao}
           position={mode.position}
           onClose={() => setMode({ kind: "idle" })}
-          onCreated={async (id) => {
+          onCreated={async (id, earned, newCell) => {
             setMode({ kind: "idle" });
             await refresh();
             setSelectedId(id);
-            showToast("☠ 새 정박지를 발견했어요!");
+            showToast(
+              `☠ 새 정박지를 발견했어요! +${earned}💰${newCell ? "\n🗺️ 해도의 새 해역을 밝혔어요" : ""}`,
+              5000,
+            );
           }}
           onDuplicate={async (existing: ExistingSpot) => {
             setMode({ kind: "idle" });
@@ -254,9 +298,11 @@ export default function MapScreen() {
         <ReportSheet
           spot={mode.spot}
           onClose={() => setMode({ kind: "idle" })}
-          onDone={async (closed) => {
+          onDone={async ({ closed, earned, bounty }) => {
             setMode({ kind: "idle" });
-            showToast(closed ? "🚧 차단기 제보가 쌓여 정박지를 닫았어요" : "📜 항해 일지를 남겼어요");
+            const msg = closed ? "🚧 차단기 제보가 쌓여 정박지를 닫았어요" : "📜 항해 일지를 남겼어요";
+            const gold = earned > 0 ? ` +${earned}💰` : "";
+            showToast(`${msg}${gold}${bounty > 0 ? `\n💰 현상금 ${bounty} 획득!` : ""}`, 5000);
             await refresh();
           }}
         />

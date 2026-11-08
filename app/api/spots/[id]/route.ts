@@ -11,7 +11,9 @@ export const GET = handle(async (_req: Request, ctx: { params: Promise<{ id: str
   await requireUser();
   const { id } = await ctx.params;
   if (!UUID.test(id)) bad("정박지를 찾을 수 없어요.", 404);
-  const [spot] = await listSpots(id);
+  const {
+    spots: [spot],
+  } = await listSpots(id);
   if (!spot) bad("정박지를 찾을 수 없어요.", 404);
 
   const reports = await db

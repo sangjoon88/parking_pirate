@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { GUARD_LABELS, guardColor, timeAgo } from "@/lib/format";
+import { FLEET_SIZE } from "@/lib/game";
 import type { ActiveParking, SpotReport, SpotSummary } from "@/lib/types";
 import Sheet from "./Sheet";
 import { Button, ErrorText } from "./ui";
@@ -67,6 +68,20 @@ export default function SpotSheet({ spotId, fallback, refreshKey, parking, onClo
       {closed && (
         <div className="mb-3 rounded-xl bg-slate-700 px-3 py-2 text-sm">🚧 차단기가 생겼다는 제보가 있어 닫힌 정박지예요.</div>
       )}
+      {spot.navyAlert && (
+        <div className="mb-3 rounded-xl bg-red-600 px-3 py-2 text-sm font-bold">
+          ⚠ 해군 출몰! {spot.navyAlert.by}님이 경계 5를 제보 · {timeAgo(spot.navyAlert.at)}
+        </div>
+      )}
+      {spot.bounty > 0 && (
+        <div className="mb-3 rounded-xl border border-green-500/50 bg-green-500/15 px-3 py-2 text-sm">
+          💰 <b className="text-green-400">현상금 {spot.bounty}두블룬</b>
+          <span className="text-slate-300"> · 가서 &ldquo;차단기 그대로 없음&rdquo; 일지를 쓰면 획득!</span>
+        </div>
+      )}
+      {spot.parkedCount >= FLEET_SIZE && (
+        <div className="mb-3 rounded-xl bg-sea-700 px-3 py-2 text-sm font-bold">⛵ 함대 집결 중! 지금 정박하면 보너스</div>
+      )}
 
       <div className="grid grid-cols-3 gap-2 text-center">
         <Stat label="정박 중" value={`${spot.parkedCount}명`} />
@@ -83,7 +98,12 @@ export default function SpotSheet({ spotId, fallback, refreshKey, parking, onClo
       </div>
 
       <p className="mt-3 text-xs text-slate-400">
-        ☠ 발견: <b className="text-slate-200">{spot.discoverer}</b> · {timeAgo(spot.createdAt)}
+        ☠ 발견:{" "}
+        <b className="text-slate-200">
+          {spot.discovererIsKing && "👑 "}
+          {spot.discoverer}
+        </b>{" "}
+        · {timeAgo(spot.createdAt)}
       </p>
 
       <div className="mt-4">

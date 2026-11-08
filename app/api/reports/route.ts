@@ -1,9 +1,11 @@
-import { and, countDistinct, eq } from "drizzle-orm";
+import { and, countDistinct, eq, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { spotReports, spots } from "@/db/schema";
 import { bad, handle, readJson, requireUser } from "@/lib/auth";
 import { GATE_CLOSE_THRESHOLD, NOTE_MAX } from "@/lib/constants";
+import { award, awardedRecently } from "@/lib/doubloons";
+import { bountyFor, REPORT_COOLDOWN_HOURS, REWARD } from "@/lib/game";
 
 /** 항해 일지 작성 */
 export const POST = handle(async (req: Request) => {
@@ -20,14 +22,40 @@ export const POST = handle(async (req: Request) => {
   if (note.length > NOTE_MAX) bad(`메모는 ${NOTE_MAX}자까지 쓸 수 있어요.`);
   if (guardLevel === null && gateStatus === null && !note) bad("경계 레벨, 차단기 상태, 메모 중 하나는 남겨 주세요.");
 
-  const [spot] = await db.select({ id: spots.id }).from(spots).where(eq(spots.id, spotId)).limit(1);
+  const [spot] = await db.select().from(spots).where(eq(spots.id, spotId)).limit(1);
   if (!spot) bad("정박지를 찾을 수 없어요.", 404);
+
+  // 일지 보상은 같은 정박지에 6시간에 한 번 (도배 방지)
+  const alreadyRewarded = await awardedRecently(user.id, "report", REPORT_COOLDOWN_HOURS, spotId);
 
   await db.insert(spotReports).values({ spotId, userId: user.id, guardLevel, gateStatus, note });
 
+  let earned = 0;
+  let bounty = 0;
+  if (!alreadyRewarded) {
+    await award(user.id, REWARD.report, "report", spotId);
+    earned += REWARD.report;
+  }
+
   let closed = false;
   if (gateStatus === "no_gate") {
-    await db.update(spots).set({ lastConfirmedAt: new Date() }).where(eq(spots.id, spotId));
+    // 현상금: 오래 확인 안 된 정박지를 "그대로 없음"으로 확인하면 획득.
+    // 행을 잠그고 "이전 확인 시각"을 읽으면서 갱신하는 한 문장이라, 동시에 써도 한 명만 받는다.
+    const res = await db.execute<{ prev: Date | string | null; created_at: Date | string; status: string }>(sql`
+      with old as (
+        select last_confirmed_at as prev, created_at, status from spots where id = ${spotId} for update
+      )
+      update spots s set last_confirmed_at = now()
+      from old where s.id = ${spotId}
+      returning old.prev, old.created_at, old.status
+    `);
+    const old = res.rows[0];
+    const due = old && old.status === "open" ? bountyFor(old.prev, old.created_at) : 0;
+    if (due > 0) {
+      await award(user.id, due, "bounty", spotId);
+      bounty = due;
+      earned += due;
+    }
   } else if (gateStatus === "gate_installed") {
     // 한 사람이 여러 번 써도 1건으로: 서로 다른 선원 2명 이상이 제보하면 closed
     const [row] = await db
@@ -40,5 +68,5 @@ export const POST = handle(async (req: Request) => {
     }
   }
 
-  return NextResponse.json({ ok: true, closed }, { status: 201 });
+  return NextResponse.json({ ok: true, closed, earned, bounty }, { status: 201 });
 });

@@ -15,7 +15,7 @@ export default function ReportSheet({
 }: {
   spot: SpotSummary;
   onClose: () => void;
-  onDone: (closed: boolean) => void;
+  onDone: (result: { closed: boolean; earned: number; bounty: number }) => void;
 }) {
   const [guardLevel, setGuardLevel] = useState<number | null>(null);
   const [gateStatus, setGateStatus] = useState<"no_gate" | "gate_installed" | null>(null);
@@ -27,11 +27,11 @@ export default function ReportSheet({
     setBusy(true);
     setError("");
     try {
-      const res = await api<{ closed: boolean }>("/api/reports", {
+      const res = await api<{ closed: boolean; earned: number; bounty: number }>("/api/reports", {
         method: "POST",
         json: { spotId: spot.id, guardLevel, gateStatus, note },
       });
-      onDone(res.closed);
+      onDone(res);
     } catch (e) {
       setError((e as Error).message);
       setBusy(false);
@@ -69,6 +69,9 @@ export default function ReportSheet({
             );
           })}
         </div>
+        {guardLevel === 5 && (
+          <p className="mt-2 text-xs font-bold text-red-400">⚠ 이 정박지에 정박 중인 선원들에게 해군 출몰 경보가 30분간 뜹니다</p>
+        )}
       </section>
 
       <section className="mt-4">
@@ -85,6 +88,11 @@ export default function ReportSheet({
             🚧 생겼음
           </Toggle>
         </div>
+        {spot.bounty > 0 && (
+          <p className="mt-2 text-xs text-green-400">
+            💰 &ldquo;그대로 없음&rdquo;으로 확인하면 현상금 {spot.bounty}두블룬을 받아요
+          </p>
+        )}
       </section>
 
       <section className="mt-4">

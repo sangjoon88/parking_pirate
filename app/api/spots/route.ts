@@ -3,11 +3,14 @@ import { db } from "@/db";
 import { spots } from "@/db/schema";
 import { bad, handle, readJson, requireUser } from "@/lib/auth";
 import { distanceMeters, DUPLICATE_SPOT_RADIUS_M, isValidCoord } from "@/lib/geo";
+import { award } from "@/lib/doubloons";
+import { REWARD } from "@/lib/game";
 import { listSpots } from "@/lib/spots";
+import { cellOf } from "@/lib/yeouido";
 
 export const GET = handle(async () => {
   await requireUser();
-  return NextResponse.json({ spots: await listSpots() });
+  return NextResponse.json(await listSpots());
 });
 
 export const POST = handle(async (req: Request) => {
@@ -35,5 +38,15 @@ export const POST = handle(async (req: Request) => {
     .insert(spots)
     .values({ name, address: address || null, lat, lng: lng as number, createdBy: user.id, lastConfirmedAt: new Date() })
     .returning({ id: spots.id });
-  return NextResponse.json({ id: created.id }, { status: 201 });
+
+  // 발견 보상 + 해도의 새 해역이면 추가 보상
+  await award(user.id, REWARD.discovery, "discovery", created.id);
+  const cell = cellOf(lat, lng as number);
+  const newCell = !!cell && !all.some((s) => cellOf(s.lat, s.lng) === cell);
+  if (newCell) await award(user.id, REWARD.newCell, "new_cell", cell);
+
+  return NextResponse.json(
+    { id: created.id, earned: REWARD.discovery + (newCell ? REWARD.newCell : 0), newCell },
+    { status: 201 },
+  );
 });

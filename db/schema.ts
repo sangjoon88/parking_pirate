@@ -96,3 +96,24 @@ export const parkings = pgTable(
 
 export type User = typeof users.$inferSelect;
 export type Spot = typeof spots.$inferSelect;
+
+/** 두블룬(금화) 장부: 모든 획득·차감 기록. 잔액 = 합계 */
+export const doubloonLogs = pgTable(
+  "doubloon_logs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    amount: integer("amount").notNull(),
+    reason: text("reason", {
+      enum: ["discovery", "new_cell", "report", "parking", "bounty", "fleet", "lineage", "lineage_ban"],
+    }).notNull(),
+    refId: text("ref_id"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("doubloon_logs_user_idx").on(t.userId, t.createdAt),
+    index("doubloon_logs_created_idx").on(t.createdAt),
+  ],
+);

@@ -45,3 +45,9 @@ select {
 .animate-sheet-up {
   animation: sheet-up 0.22s ease-out;
 }
+
+@keyframes pp-blink {
+  to {
+    visibility: hidden;
+  }
+}
