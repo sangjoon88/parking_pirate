@@ -449,11 +449,15 @@ export default function MapScreen({ initialFog = false }: { initialFog?: boolean
           spot={mode.spot}
           weather={weather}
           onClose={() => setMode({ kind: "idle" })}
-          onDone={async ({ closed, earned, bounty }) => {
+          onDone={async ({ closed, earned, bounty, photoFailed }) => {
             setMode({ kind: "idle" });
-            const msg = closed ? "🚧 차단기 제보가 쌓여 정박지를 닫았어요" : "📜 항해 일지를 남겼어요";
-            const gold = earned > 0 ? ` +${earned}💰` : "";
-            showToast(`${msg}${gold}${bounty > 0 ? `\n💰 현상금 ${bounty} 획득!` : ""}`, 5000);
+            const lines = [
+              (closed ? "🚧 차단기 제보가 쌓여 정박지를 닫았어요" : "📜 항해 일지를 남겼어요") +
+                (earned > 0 ? ` +${earned}💰` : ""),
+            ];
+            if (bounty > 0) lines.push(`💰 현상금 ${bounty} 획득!`);
+            if (photoFailed) lines.push("📷 사진은 올리지 못했어요. 일지는 저장됐어요");
+            showToast(lines.join("\n"), 5000);
             await refresh();
           }}
         />

@@ -108,6 +108,12 @@ export const RADIO_COOLDOWN_MINUTES = 3;
 export const WONDER_NOTE_MAX = 100;
 export const WONDER_MAX_OPEN = 10; // 한 선원이 동시에 찍어 둘 수 있는 궁금한 곳
 export const DESCRIPTION_MAX = 500;
+
+/* 사진 (DB 저장: Neon 무료 0.5GB 안에서 쓰도록 크기·개수 제한) */
+export const PHOTO_MAX_EDGE = 1280; // 긴 변 픽셀 (브라우저에서 줄임)
+export const PHOTO_MAX_BYTES = 700 * 1024; // 한 장 최대
+export const SPOT_PHOTO_MAX = 12; // 정박지 소개 사진 최대 장수
+export const PHOTO_TOTAL_MAX_BYTES = 400 * 1024 * 1024; // 전체 사진 용량 상한
 export const DUEL_DAYS = 7;
 export const DUEL_PENDING_DAYS = 2;
 export const DUEL_STAKES = [20, 50, 100, 200] as const;

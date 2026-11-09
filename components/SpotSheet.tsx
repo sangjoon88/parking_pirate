@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { GUARD_LABELS, guardColor, timeAgo } from "@/lib/format";
 import { BOUNTY_POST, DESCRIPTION_MAX, FLEET_SIZE, LEGEND_PARKINGS, STASH } from "@/lib/game";
-import type { ActiveParking, SpotReport, SpotSummary } from "@/lib/types";
+import type { ActiveParking, SpotPhoto, SpotReport, SpotSummary } from "@/lib/types";
 import { AmountSheet } from "./feedback";
+import { PhotoViewer, photoUrl, SpotPhotoStrip } from "./Photos";
 import Sheet from "./Sheet";
 import { Button, ErrorText } from "./ui";
 
@@ -21,7 +22,7 @@ type Props = {
   onChanged: (message: string) => void;
 };
 
-type Detail = { spot: SpotSummary; reports: SpotReport[]; me: { id: string; balance: number } };
+type Detail = { spot: SpotSummary; reports: SpotReport[]; photos: SpotPhoto[]; me: { id: string; balance: number } };
 type Sub = null | "bounty" | "stash" | "nickname" | "description";
 
 const AMOUNTS = [10, 30, 50, 100] as const;
@@ -41,6 +42,7 @@ export default function SpotSheet({
   const [busy, setBusy] = useState(false);
   const [sub, setSub] = useState<Sub>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [viewing, setViewing] = useState<SpotReport | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -205,6 +207,15 @@ export default function SpotSheet({
         )}
       </div>
 
+      <SpotPhotoStrip
+        spotId={spot.id}
+        photos={detail?.photos ?? null}
+        onChanged={(msg) => {
+          setReloadKey((k) => k + 1);
+          onChanged(msg);
+        }}
+      />
+
       {/* 영주 · 발견자 */}
       <div className="mt-3 divide-y divide-sea-700 rounded-xl bg-sea-800 text-sm">
         <div className="flex items-center justify-between px-3 py-2">
@@ -278,11 +289,24 @@ export default function SpotSheet({
                   {r.gateStatus === "gate_installed" && <span className="text-red-400">차단기 생김</span>}
                 </div>
                 {r.note && <p className="mt-1 text-sm break-words whitespace-pre-wrap">{r.note}</p>}
+                {r.photoId && (
+                  <button onClick={() => setViewing(r)} className="mt-2 block h-24 w-32 overflow-hidden rounded-lg bg-sea-900">
+                    {/* eslint-disable-next-line @next/next/no-img-element -- 로그인 쿠키가 필요한 API 사진 */}
+                    <img src={photoUrl(r.photoId)} alt="일지 사진" loading="lazy" className="h-full w-full object-cover" />
+                  </button>
+                )}
               </li>
             ))}
           </ul>
         )}
       </div>
+      {viewing?.photoId && (
+        <PhotoViewer
+          id={viewing.photoId}
+          caption={`${viewing.nickname}의 항해 일지 · ${timeAgo(viewing.createdAt)}`}
+          onClose={() => setViewing(null)}
+        />
+      )}
     </Sheet>
   );
 }

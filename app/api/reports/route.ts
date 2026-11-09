@@ -21,7 +21,11 @@ export const POST = handle(async (req: Request) => {
     bad("경계 레벨은 1~5 중에서 골라 주세요.");
   }
   if (note.length > NOTE_MAX) bad(`메모는 ${NOTE_MAX}자까지 쓸 수 있어요.`);
-  if (guardLevel === null && gateStatus === null && !note) bad("경계 레벨, 차단기 상태, 메모 중 하나는 남겨 주세요.");
+  // 사진만 올리는 일지도 허용 (사진은 일지를 만든 뒤 따로 올라온다)
+  const hasPhoto = body.hasPhoto === true;
+  if (guardLevel === null && gateStatus === null && !note && !hasPhoto) {
+    bad("경계 레벨, 차단기 상태, 메모, 사진 중 하나는 남겨 주세요.");
+  }
 
   const [spot] = await db.select().from(spots).where(eq(spots.id, spotId)).limit(1);
   if (!spot) bad("정박지를 찾을 수 없어요.", 404);
@@ -29,7 +33,10 @@ export const POST = handle(async (req: Request) => {
   // 일지 보상은 같은 정박지에 6시간에 한 번 (도배 방지)
   const alreadyRewarded = await awardedRecently(user.id, "report", REPORT_COOLDOWN_HOURS, spotId);
 
-  await db.insert(spotReports).values({ spotId, userId: user.id, guardLevel, gateStatus, note });
+  const [report] = await db
+    .insert(spotReports)
+    .values({ spotId, userId: user.id, guardLevel, gateStatus, note })
+    .returning({ id: spotReports.id });
 
   let earned = 0;
   let bounty = 0;
@@ -85,5 +92,5 @@ export const POST = handle(async (req: Request) => {
     }
   }
 
-  return NextResponse.json({ ok: true, closed, earned, bounty }, { status: 201 });
+  return NextResponse.json({ ok: true, id: report.id, closed, earned, bounty }, { status: 201 });
 });

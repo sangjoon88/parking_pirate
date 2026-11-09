@@ -5,6 +5,8 @@ import { api } from "@/lib/api";
 import { NOTE_MAX } from "@/lib/constants";
 import { GUARD_LABELS, guardColor } from "@/lib/format";
 import type { SpotSummary, WeatherId } from "@/lib/types";
+import { uploadPhoto } from "@/lib/image";
+import { PhotoPicker } from "./Photos";
 import Sheet from "./Sheet";
 import { Button, ErrorText } from "./ui";
 
@@ -17,11 +19,12 @@ export default function ReportSheet({
   spot: SpotSummary;
   weather: WeatherId;
   onClose: () => void;
-  onDone: (result: { closed: boolean; earned: number; bounty: number }) => void;
+  onDone: (result: { closed: boolean; earned: number; bounty: number; photoFailed: boolean }) => void;
 }) {
   const [guardLevel, setGuardLevel] = useState<number | null>(null);
   const [gateStatus, setGateStatus] = useState<"no_gate" | "gate_installed" | null>(null);
   const [note, setNote] = useState("");
+  const [photo, setPhoto] = useState<File | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -29,11 +32,19 @@ export default function ReportSheet({
     setBusy(true);
     setError("");
     try {
-      const res = await api<{ closed: boolean; earned: number; bounty: number }>("/api/reports", {
+      const res = await api<{ id: string; closed: boolean; earned: number; bounty: number }>("/api/reports", {
         method: "POST",
-        json: { spotId: spot.id, guardLevel, gateStatus, note },
+        json: { spotId: spot.id, guardLevel, gateStatus, note, hasPhoto: !!photo },
       });
-      onDone(res);
+      let photoFailed = false;
+      if (photo) {
+        try {
+          await uploadPhoto(spot.id, photo, res.id);
+        } catch {
+          photoFailed = true; // 일지는 이미 저장됨: 사진만 실패했다고 알린다
+        }
+      }
+      onDone({ ...res, photoFailed });
     } catch (e) {
       setError((e as Error).message);
       setBusy(false);
@@ -52,7 +63,7 @@ export default function ReportSheet({
       footer={
         <Button
           onClick={submit}
-          disabled={busy || (guardLevel === null && gateStatus === null && !note.trim())}
+          disabled={busy || (guardLevel === null && gateStatus === null && !note.trim() && !photo)}
           className="w-full"
         >
           {busy ? "기록 중…" : "일지 남기기"}
@@ -120,6 +131,10 @@ export default function ReportSheet({
           placeholder="예: 지하 2층은 입주민 전용 표시. 지상 방문자 칸 넉넉함"
           className="w-full rounded-xl border border-sea-600 bg-sea-800 px-3 py-2 text-white outline-none placeholder:text-slate-500 focus:border-gold-400"
         />
+      </section>
+
+      <section className="mt-4">
+        <PhotoPicker file={photo} onChange={setPhoto} />
       </section>
 
       <div className="mt-3 pb-1">

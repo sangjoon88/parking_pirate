@@ -42,6 +42,16 @@ export type SpotReport = {
   note: string;
   createdAt: string;
   nickname: string;
+  photoId: string | null;
+};
+
+export type SpotPhoto = {
+  id: string;
+  nickname: string;
+  createdAt: string;
+  width: number | null;
+  height: number | null;
+  canDelete: boolean;
 };
 
 export type ActiveParking = {

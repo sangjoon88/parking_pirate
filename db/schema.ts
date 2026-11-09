@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   check,
+  customType,
   doublePrecision,
   index,
   integer,
@@ -236,4 +237,34 @@ export const wonders = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("wonders_open_idx").on(t.resolvedAt)],
+);
+
+/** 사진 원본 바이트 (Postgres bytea) */
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType: () => "bytea",
+});
+
+/**
+ * 사진: 정박지 소개 사진(reportId 없음) 또는 항해 일지 사진(reportId 있음).
+ * 브라우저에서 줄이고 위치 정보(EXIF)를 지운 JPEG만 받는다.
+ */
+export const photos = pgTable(
+  "photos",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    spotId: uuid("spot_id")
+      .notNull()
+      .references(() => spots.id),
+    reportId: uuid("report_id").references(() => spotReports.id),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    mime: text("mime").notNull(),
+    data: bytea("data").notNull(),
+    size: integer("size").notNull(),
+    width: integer("width"),
+    height: integer("height"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("photos_spot_idx").on(t.spotId, t.createdAt), index("photos_report_idx").on(t.reportId)],
 );
