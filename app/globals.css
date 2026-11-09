@@ -61,3 +61,31 @@ select {
     transform: translate(-50%, -4px);
   }
 }
+
+/* 픽셀 해적기: 세로줄마다 1픽셀씩 계단식으로 펄럭임 */
+@keyframes pp-flag-wave {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(1px);
+  }
+}
+.pp-flag-col {
+  animation: pp-flag-wave 1.1s steps(1, end) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pp-flag-col {
+    animation: none;
+  }
+}
+
+/* 픽셀 느낌 제목: 계단식 그림자 */
+.pp-pixel-title {
+  text-shadow:
+    2px 0 0 #7a4d12,
+    0 2px 0 #7a4d12,
+    2px 2px 0 #7a4d12,
+    4px 4px 0 #07111f;
+}
