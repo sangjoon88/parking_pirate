@@ -1,7 +1,11 @@
 "use client";
 
+import { UnifrakturCook } from "next/font/google";
 import { useEffect, useState } from "react";
 import PixelFlag from "./PixelFlag";
+
+// 스플래시 제목용 블랙레터 (빌드할 때 내려받아 앱과 함께 배포됨, 외부 요청 없음)
+const blackletter = UnifrakturCook({ weight: "700", subsets: ["latin"], display: "block" });
 
 const KEY = "pp_splash_seen";
 const SHOW_MS = 1400;
@@ -40,7 +44,9 @@ export default function Splash() {
       }`}
     >
       <PixelFlag className="w-[min(72vw,320px)]" />
-      <h1 className="pp-pixel-title mt-6 text-4xl font-black tracking-widest text-gold-400">주차해적단</h1>
+      <h1 lang="en" className={`pp-pixel-title mt-6 text-[2.75rem] leading-none text-gold-400 ${blackletter.className}`}>
+        Parking Pirate
+      </h1>
       <p className="mt-2 text-xs font-bold tracking-[0.3em] text-slate-400">YEOUIDO FLEET</p>
     </div>
   );
