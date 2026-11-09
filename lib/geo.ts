@@ -22,5 +22,4 @@ export function isValidCoord(lat: unknown, lng: unknown): lat is number {
   );
 }
 
-export const PARKING_RADIUS_M = 300;
 export const DUPLICATE_SPOT_RADIUS_M = 100;

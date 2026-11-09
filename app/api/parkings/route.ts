@@ -8,25 +8,20 @@ import { award, awardedRecently } from "@/lib/doubloons";
 import { boosted, FLEET_SIZE, PARKING_REWARD_COOLDOWN_HOURS, REWARD, TOLL } from "@/lib/game";
 import { lordsBySpot } from "@/lib/lords";
 import { claimStash, claimTreasure } from "@/lib/treasure";
-import { distanceMeters, isValidCoord, PARKING_RADIUS_M } from "@/lib/geo";
 import { activeParkersAt, closeStaleParkings, getActiveParking } from "@/lib/parking";
 
-/** 정박 시작. 좌표는 거리 확인에만 쓰고 저장하지 않는다. */
+/**
+ * 정박 시작. 위치(GPS) 확인은 하지 않는다.
+ * 주차하고 사무실 등으로 이동한 뒤에 기록하는 경우가 많아서 운영 결정으로 껐다.
+ */
 export const POST = handle(async (req: Request) => {
   const user = await requireUser();
   const body = await readJson(req);
   const spotId = typeof body.spotId === "string" ? body.spotId : "";
-  const { lat, lng } = body;
-  if (!isValidCoord(lat, lng)) bad("현재 위치를 확인할 수 없어요.");
 
   const [spot] = await db.select().from(spots).where(eq(spots.id, spotId)).limit(1);
   if (!spot) bad("정박지를 찾을 수 없어요.", 404);
   if (spot.status === "closed") bad("차단기가 생긴 정박지라 정박할 수 없어요.");
-
-  const d = distanceMeters(lat, lng as number, spot.lat, spot.lng);
-  if (d > PARKING_RADIUS_M) {
-    bad(`정박지에서 ${Math.round(d)}m 떨어져 있어요. ${PARKING_RADIUS_M}m 안에서만 정박할 수 있어요.`);
-  }
 
   await closeStaleParkings(user.id);
   const active = await getActiveParking(user.id);

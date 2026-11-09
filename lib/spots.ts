@@ -17,6 +17,9 @@ type Row = {
   lng: number;
   status: "open" | "closed";
   posted_bounty: number | string;
+  description: string | null;
+  description_at: Date | string | null;
+  description_by: string | null;
   last_confirmed_at: Date | string | null;
   created_at: Date | string;
   created_by: string;
@@ -47,6 +50,7 @@ export async function listSpots(spotId?: string) {
     db.execute<Row>(sql`
       select
         s.id, s.name, s.nickname, s.address, s.lat, s.lng, s.status, s.posted_bounty,
+        s.description, s.description_at, (select nickname from users du where du.id = s.description_by) as description_by,
         s.last_confirmed_at, s.created_at, s.created_by,
         u.nickname as discoverer,
         (select count(*)::int from parkings p
@@ -97,6 +101,9 @@ export async function listSpots(spotId?: string) {
       guardAvg: r.guard_avg == null ? null : Number(r.guard_avg),
       bounty: totalBounty({ status: r.status, lastConfirmedAt, createdAt, postedBounty: Number(r.posted_bounty) }),
       postedBounty: Number(r.posted_bounty),
+      description: r.description,
+      descriptionBy: r.description_by,
+      descriptionAt: iso(r.description_at),
       navyAlert: r.alert_at ? { at: iso(r.alert_at)!, by: r.alert_by ?? "" } : null,
       lord: lords.get(r.id) ?? null,
       treasure: !!treasure && treasure.spotId === r.id && !treasure.claimedBy ? treasure.amount : 0,

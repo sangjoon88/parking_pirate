@@ -6,6 +6,7 @@ export const REWARD = {
   report: 10, // 항해 일지 (같은 정박지는 6시간에 한 번만 지급)
   parking: 5, // 정박 (3시간에 한 번만 지급)
   fleet: 15, // 함대 집결 (같은 정박지 3명 이상)
+  wonder: 10, // 내가 찍은 궁금한 곳에 누군가 정박지를 등록해 줌
   banPenalty: -100, // 내가 추천한 선원이 추방되면
 } as const;
 
@@ -104,6 +105,9 @@ export const TREASURE_MAX = 100;
 export const RADIO_MAX_LEN = 60;
 export const RADIO_TTL_MINUTES = 60;
 export const RADIO_COOLDOWN_MINUTES = 3;
+export const WONDER_NOTE_MAX = 100;
+export const WONDER_MAX_OPEN = 10; // 한 선원이 동시에 찍어 둘 수 있는 궁금한 곳
+export const DESCRIPTION_MAX = 500;
 export const DUEL_DAYS = 7;
 export const DUEL_PENDING_DAYS = 2;
 export const DUEL_STAKES = [20, 50, 100, 200] as const;

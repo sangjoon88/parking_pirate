@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
-import { randomFortune, RADIO_MAX_LEN, WEATHERS, type WeatherId } from "@/lib/game";
+import { timeAgo } from "@/lib/format";
+import { randomFortune, RADIO_MAX_LEN, REWARD, WEATHERS, WONDER_NOTE_MAX, type WeatherId } from "@/lib/game";
 import { getPosition, type Kakao, type LatLng } from "@/lib/kakao";
-import type { ActiveParking, RadioMessage, SpotSummary } from "@/lib/types";
+import type { ActiveParking, RadioMessage, SpotSummary, Wonder } from "@/lib/types";
 import { exploredCells, YEOUIDO_CELLS } from "@/lib/yeouido";
 import { useConfirm, useToast } from "./feedback";
 import KakaoMap, { type KakaoMapHandle } from "./KakaoMap";
@@ -19,21 +20,33 @@ const POLL_MS = 30_000;
 // 여의도 위주로 쓰므로 지도는 여의도에서 시작한다 (내 위치는 🎯 버튼으로 이동)
 const START_CENTER: LatLng = { lat: 37.5255, lng: 126.9245 };
 const START_LEVEL = 6; // 여의도 섬 전체가 보이는 정도
-const HINT_KEY = "pp_map_hint_v1";
+const HINT_KEY = "pp_map_hint_v2";
 
+type Purpose = "spot" | "wonder" | "radio";
 type Mode =
   | { kind: "idle" }
-  | { kind: "placing"; purpose: "spot" | "radio" }
+  | { kind: "menu"; position: LatLng | null } // 무엇을 찍을지 고르기 (길게 누르면 위치가 정해져 있음)
+  | { kind: "placing"; purpose: Purpose }
   | { kind: "new"; position: LatLng }
+  | { kind: "wonder-new"; position: LatLng }
+  | { kind: "wonder"; wonder: Wonder }
   | { kind: "radio"; position: LatLng }
   | { kind: "report"; spot: SpotSummary };
 
 type SpotsResponse = { spots: SpotSummary[]; weather: WeatherId };
 
+const PURPOSE_HINT: Record<Purpose, string> = {
+  spot: "지도를 움직여 📍를 정박지 위에 맞춰 주세요",
+  wonder: "지도를 움직여 📍를 궁금한 곳에 맞춰 주세요",
+  radio: "지도를 움직여 📍를 무전 남길 곳에 맞춰 주세요",
+};
+
 export default function MapScreen({ initialFog = false }: { initialFog?: boolean }) {
   const mapRef = useRef<KakaoMapHandle>(null);
   const [spots, setSpots] = useState<SpotSummary[]>([]);
   const [radios, setRadios] = useState<RadioMessage[]>([]);
+  const [wonders, setWonders] = useState<Wonder[]>([]);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [weather, setWeather] = useState<WeatherId>("calm");
   const [parking, setParking] = useState<ActiveParking>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -57,12 +70,15 @@ export default function MapScreen({ initialFog = false }: { initialFog?: boolean
         api<SpotsResponse>("/api/spots"),
         api<{ parking: ActiveParking }>("/api/parkings/current"),
         api<{ messages: RadioMessage[] }>("/api/radio"),
+        api<{ wonders: Wonder[]; canDeleteAll: boolean }>("/api/wonders"),
       ])
-        .then(([s, p, r]) => {
+        .then(([s, p, r, w]) => {
           setSpots(s.spots);
           setWeather(s.weather);
           setParking(p.parking);
           setRadios(r.messages);
+          setWonders(w.wonders);
+          setIsAdmin(w.canDeleteAll);
           setRefreshKey((k) => k + 1);
           // 해군 출몰 경보: 내가 정박한 곳에 새 경보가 뜨면 진동 + 알림
           const alert = p.parking?.navyAlert;
@@ -92,6 +108,7 @@ export default function MapScreen({ initialFog = false }: { initialFog?: boolean
     };
   }, [refresh]);
 
+  /** 내 위치는 지도에 점으로만 보여 준다 (서버로 보내지 않음) */
   const locateMe = useCallback(
     async (silent = false, pan = true) => {
       setLocating(true);
@@ -109,12 +126,9 @@ export default function MapScreen({ initialFog = false }: { initialFog?: boolean
   );
 
   async function startParking(spot: SpotSummary) {
-    const p = await getPosition(true);
-    mapRef.current?.setMyLocation(p);
-    // 좌표는 거리 확인용으로만 서버에 보내고, 서버는 저장하지 않는다
     const res = await api<{ parking: ActiveParking; earned: number; fleet: boolean; events: string[] }>(
       "/api/parkings",
-      { method: "POST", json: { spotId: spot.id, lat: p.lat, lng: p.lng } },
+      { method: "POST", json: { spotId: spot.id } },
     );
     setParking(res.parking);
     setSelectedId(null);
@@ -164,6 +178,14 @@ export default function MapScreen({ initialFog = false }: { initialFog?: boolean
     }
   }
 
+  /** 메뉴에서 고른 뒤: 위치가 정해져 있으면 바로 입력, 아니면 지도로 위치 고르기 */
+  function choose(purpose: Purpose, position: LatLng | null) {
+    if (!position) return setMode({ kind: "placing", purpose });
+    if (purpose === "spot") setMode({ kind: "new", position });
+    else if (purpose === "wonder") setMode({ kind: "wonder-new", position });
+    else setMode({ kind: "radio", position });
+  }
+
   const selected = spots.find((s) => s.id === selectedId);
   const placing = mode.kind === "placing";
   const w = WEATHERS[weather];
@@ -176,6 +198,7 @@ export default function MapScreen({ initialFog = false }: { initialFog?: boolean
         initialLevel={START_LEVEL}
         spots={spots}
         radios={radios}
+        wonders={wonders}
         selectedId={selectedId}
         fogExplored={fog ? explored : null}
         onSpotTap={(id) => {
@@ -183,10 +206,15 @@ export default function MapScreen({ initialFog = false }: { initialFog?: boolean
           dismissHint();
           setSelectedId(id);
         }}
+        onWonderTap={(id) => {
+          if (placing) return;
+          const found = wonders.find((x) => x.id === id);
+          if (found) setMode({ kind: "wonder", wonder: found });
+        }}
         onLongPress={(position) => {
           dismissHint();
           setSelectedId(null);
-          setMode({ kind: "new", position });
+          setMode({ kind: "menu", position });
         }}
         onReady={(k) => {
           setKakao(k);
@@ -239,9 +267,7 @@ export default function MapScreen({ initialFog = false }: { initialFog?: boolean
         )}
         {placing && (
           <div className="rounded-2xl bg-sea-900/95 px-4 py-3 text-center text-sm font-semibold shadow-lg">
-            {mode.purpose === "spot"
-              ? "지도를 움직여 📍를 정박지 위에 맞춰 주세요"
-              : "지도를 움직여 📍를 무전 남길 곳에 맞춰 주세요"}
+            {PURPOSE_HINT[mode.purpose]}
           </div>
         )}
         {hint && !placing && (
@@ -249,8 +275,8 @@ export default function MapScreen({ initialFog = false }: { initialFog?: boolean
             <div className="mb-1 font-bold text-gold-400">☠ 주차해적단 사용법</div>
             <ul className="space-y-0.5 text-slate-300">
               <li>· 핀을 누르면 정박지 정보와 [정박 시작]</li>
-              <li>· 지도를 길게 누르거나 [+ 정박지]로 새로 등록</li>
-              <li>· 📦 보물상자, 💰 현상금 핀을 노려 보세요</li>
+              <li>· [+ 찍기]나 지도 길게 누르기로 정박지·궁금한 곳·무전</li>
+              <li>· 📦 보물상자, 💰 현상금, ❓ 궁금한 곳을 노려 보세요</li>
             </ul>
             <button onClick={dismissHint} className="mt-2 h-9 w-full rounded-lg bg-sea-700 text-xs font-bold">
               알겠어요
@@ -268,10 +294,7 @@ export default function MapScreen({ initialFog = false }: { initialFog?: boolean
 
       {/* 왼쪽 아래: 보기 전환 */}
       {!placing && (
-        <div className="absolute bottom-4 left-3 z-20 flex flex-col gap-3">
-          <RoundButton label="무전 남기기" onClick={() => setMode({ kind: "placing", purpose: "radio" })}>
-            📻
-          </RoundButton>
+        <div className="absolute bottom-4 left-3 z-20">
           <RoundButton label="해도 보기" active={fog} onClick={() => setFog((f) => !f)}>
             🗺️
           </RoundButton>
@@ -293,8 +316,7 @@ export default function MapScreen({ initialFog = false }: { initialFog?: boolean
             <button
               onClick={() => {
                 const c = mapRef.current?.getCenter();
-                if (!c) return;
-                setMode(mode.purpose === "spot" ? { kind: "new", position: c } : { kind: "radio", position: c });
+                if (c) choose(mode.purpose, c);
               }}
               className="h-14 rounded-full bg-gold-400 px-5 font-black text-sea-950 shadow-lg"
             >
@@ -306,17 +328,42 @@ export default function MapScreen({ initialFog = false }: { initialFog?: boolean
             onClick={() => {
               dismissHint();
               setSelectedId(null);
-              setMode({ kind: "placing", purpose: "spot" });
+              setMode({ kind: "menu", position: null });
             }}
-            className="h-14 rounded-full bg-gold-400 px-5 font-black text-sea-950 shadow-lg active:bg-gold-500"
+            className="h-14 rounded-full bg-gold-400 px-6 text-lg font-black text-sea-950 shadow-lg active:bg-gold-500"
           >
-            + 정박지
+            + 찍기
           </button>
         )}
       </div>
 
       {toastNode}
       {confirmNode}
+
+      {mode.kind === "menu" && (
+        <Sheet onClose={() => setMode({ kind: "idle" })} title={<h2 className="text-lg font-black">무엇을 찍을까요?</h2>}>
+          <div className="space-y-2 pb-1">
+            <MenuItem
+              icon="☠"
+              title="정박지 등록"
+              desc={`차단기 없는 단지를 발견했어요 · +${REWARD.discovery}💰`}
+              onClick={() => choose("spot", mode.position)}
+            />
+            <MenuItem
+              icon="❓"
+              title="궁금한 곳 찍기"
+              desc={`여기 차단기 있나? 누가 확인해 주면 +${REWARD.wonder}💰`}
+              onClick={() => choose("wonder", mode.position)}
+            />
+            <MenuItem
+              icon="📻"
+              title="무전 남기기"
+              desc="한 줄 쪽지, 1시간 동안 지도에 표시"
+              onClick={() => choose("radio", mode.position)}
+            />
+          </div>
+        </Sheet>
+      )}
 
       {selectedId && mode.kind === "idle" && (
         <SpotSheet
@@ -340,17 +387,53 @@ export default function MapScreen({ initialFog = false }: { initialFog?: boolean
           kakao={kakao}
           position={mode.position}
           onClose={() => setMode({ kind: "idle" })}
-          onCreated={async (id, earned, newCell) => {
+          onCreated={async (id, earned, newCell, wondersSolved) => {
             setMode({ kind: "idle" });
             await refresh();
             setSelectedId(id);
-            showToast(`☠ 새 정박지를 발견했어요! +${earned}💰${newCell ? "\n🗺️ 해도의 새 해역을 밝혔어요" : ""}`, 5000);
+            const lines = [`☠ 새 정박지를 발견했어요! +${earned}💰`];
+            if (newCell) lines.push("🗺️ 해도의 새 해역을 밝혔어요");
+            if (wondersSolved) lines.push(`❓ 궁금한 곳 ${wondersSolved}개가 풀렸어요`);
+            showToast(lines.join("\n"), 5000);
           }}
           onDuplicate={async (existing: ExistingSpot) => {
             setMode({ kind: "idle" });
             showToast(`이미 등록된 정박지가 있어요: ${existing.name}`);
             await refresh();
             focusSpot(existing);
+          }}
+        />
+      )}
+
+      {mode.kind === "wonder-new" && (
+        <WonderComposeSheet
+          position={mode.position}
+          onClose={() => setMode({ kind: "idle" })}
+          onSent={async () => {
+            setMode({ kind: "idle" });
+            showToast("❓ 궁금한 곳을 찍었어요. 선원들이 확인해 줄 거예요");
+            await refresh();
+          }}
+        />
+      )}
+
+      {mode.kind === "wonder" && (
+        <WonderSheet
+          wonder={mode.wonder}
+          canDelete={mode.wonder.mine || isAdmin}
+          onClose={() => setMode({ kind: "idle" })}
+          onRegister={() => setMode({ kind: "new", position: { lat: mode.wonder.lat, lng: mode.wonder.lng } })}
+          onDelete={async () => {
+            const ok = await confirm({ title: "궁금한 곳을 지울까요?", confirmLabel: "지우기", danger: true });
+            if (!ok) return;
+            try {
+              await api(`/api/wonders/${mode.wonder.id}`, { method: "DELETE" });
+              setMode({ kind: "idle" });
+              showToast("❓ 궁금한 곳을 지웠어요");
+              await refresh();
+            } catch (e) {
+              showToast((e as Error).message);
+            }
           }}
         />
       )}
@@ -410,6 +493,111 @@ function RoundButton({
     >
       {children}
     </button>
+  );
+}
+
+function MenuItem({ icon, title, desc, onClick }: { icon: string; title: string; desc: string; onClick: () => void }) {
+  return (
+    <button onClick={onClick} className="flex w-full items-center gap-3 rounded-2xl bg-sea-800 px-4 py-3 text-left active:bg-sea-700">
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-sea-900 text-2xl">{icon}</span>
+      <span className="min-w-0">
+        <span className="block font-bold">{title}</span>
+        <span className="block text-xs text-slate-400">{desc}</span>
+      </span>
+    </button>
+  );
+}
+
+function WonderComposeSheet({ position, onClose, onSent }: { position: LatLng; onClose: () => void; onSent: () => void }) {
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const quick = ["차단기 있나요?", "경비 엄한가요?", "방문 주차 되나요?", "지하 주차장 열려 있나요?"];
+  async function send() {
+    setBusy(true);
+    setError("");
+    try {
+      await api("/api/wonders", { method: "POST", json: { note, lat: position.lat, lng: position.lng } });
+      onSent();
+    } catch (e) {
+      setError((e as Error).message);
+      setBusy(false);
+    }
+  }
+  return (
+    <Sheet
+      onClose={onClose}
+      title={<h2 className="text-lg font-black">❓ 궁금한 곳 찍기</h2>}
+      footer={
+        <Button onClick={send} disabled={busy} className="w-full">
+          {busy ? "찍는 중…" : "❓ 찍기"}
+        </Button>
+      }
+    >
+      <p className="mb-2 text-xs text-slate-400">
+        선원 모두에게 보여요. 누군가 근처(100m)에 정박지를 등록하면 자동으로 풀리고, 찍은 사람은 +{REWARD.wonder}💰를 받아요.
+      </p>
+      <div className="mb-2 flex flex-wrap gap-1.5">
+        {quick.map((q) => (
+          <button key={q} onClick={() => setNote(q)} className="h-9 rounded-full bg-sea-800 px-3 text-xs font-semibold">
+            {q}
+          </button>
+        ))}
+      </div>
+      <input
+        value={note}
+        onChange={(e) => setNote(e.target.value.slice(0, WONDER_NOTE_MAX))}
+        placeholder="무엇이 궁금한가요? (선택)"
+        className="h-12 w-full rounded-xl border border-sea-600 bg-sea-800 px-4 text-white outline-none placeholder:text-slate-500 focus:border-gold-400"
+      />
+      <div className="mt-1 text-right text-xs text-slate-500">
+        {note.length}/{WONDER_NOTE_MAX}
+      </div>
+      <ErrorText>{error}</ErrorText>
+    </Sheet>
+  );
+}
+
+function WonderSheet({
+  wonder,
+  canDelete,
+  onClose,
+  onRegister,
+  onDelete,
+}: {
+  wonder: Wonder;
+  canDelete: boolean;
+  onClose: () => void;
+  onRegister: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <Sheet
+      onClose={onClose}
+      title={
+        <>
+          <p className="text-xs font-bold text-violet-300">❓ 궁금한 곳</p>
+          <h2 className="text-lg font-black break-words">{wonder.note || "여기 어때요?"}</h2>
+        </>
+      }
+      footer={
+        <div className={`grid gap-2 ${canDelete ? "grid-cols-[1fr_auto]" : ""}`}>
+          <Button onClick={onRegister}>☠ 확인했어요, 정박지로 등록</Button>
+          {canDelete && (
+            <Button variant="ghost" onClick={onDelete} className="px-5">
+              지우기
+            </Button>
+          )}
+        </div>
+      }
+    >
+      <p className="text-sm text-slate-300">
+        {wonder.mine ? "내가" : `${wonder.nickname}님이`} {timeAgo(wonder.createdAt)}에 찍었어요.
+      </p>
+      <p className="mt-2 pb-1 text-xs text-slate-400">
+        가 보고 차단기가 없으면 정박지로 등록해 주세요. 발견 금화를 받고, 찍은 선원도 +{REWARD.wonder}💰를 받아요.
+      </p>
+    </Sheet>
   );
 }
 

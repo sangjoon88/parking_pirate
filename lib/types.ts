@@ -21,6 +21,10 @@ export type SpotSummary = {
   bounty: number;
   /** 그중 선원이 건 몫 */
   postedBounty: number;
+  /** 정박지 소개 (누구나 고침) */
+  description: string | null;
+  descriptionBy: string | null;
+  descriptionAt: string | null;
   /** 최근 30분 안의 경계 레벨 5 제보 */
   navyAlert: { at: string; by: string } | null;
   /** 영주 (최근 30일 최다 정박) */
@@ -49,5 +53,7 @@ export type ActiveParking = {
 } | null;
 
 export type RadioMessage = { id: string; lat: number; lng: number; text: string; createdAt: string; nickname: string; mine: boolean };
+
+export type Wonder = { id: string; lat: number; lng: number; note: string; createdAt: string; nickname: string; mine: boolean };
 
 export type WeatherId = "calm" | "storm" | "fog" | "tailwind";

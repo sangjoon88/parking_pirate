@@ -4,7 +4,8 @@ import { spots } from "@/db/schema";
 import { bad, handle, readJson, requireUser } from "@/lib/auth";
 import { distanceMeters, DUPLICATE_SPOT_RADIUS_M, isValidCoord } from "@/lib/geo";
 import { award } from "@/lib/doubloons";
-import { REWARD } from "@/lib/game";
+import { DESCRIPTION_MAX, REWARD } from "@/lib/game";
+import { resolveWondersNear } from "@/lib/wonders";
 import { listSpots } from "@/lib/spots";
 import { cellOf } from "@/lib/yeouido";
 
@@ -34,9 +35,19 @@ export const POST = handle(async (req: Request) => {
     );
   }
 
+  const description = typeof body.description === "string" ? body.description.trim().slice(0, DESCRIPTION_MAX) : "";
+  const now = new Date();
   const [created] = await db
     .insert(spots)
-    .values({ name, address: address || null, lat, lng: lng as number, createdBy: user.id, lastConfirmedAt: new Date() })
+    .values({
+      name,
+      address: address || null,
+      lat,
+      lng: lng as number,
+      createdBy: user.id,
+      lastConfirmedAt: now,
+      ...(description ? { description, descriptionBy: user.id, descriptionAt: now } : {}),
+    })
     .returning({ id: spots.id });
 
   // 발견 보상 + 해도의 새 해역이면 추가 보상
@@ -45,8 +56,11 @@ export const POST = handle(async (req: Request) => {
   const newCell = !!cell && !all.some((s) => cellOf(s.lat, s.lng) === cell);
   if (newCell) await award(user.id, REWARD.newCell, "new_cell", cell);
 
+  // 근처에 찍혀 있던 궁금한 곳(❓) 해결
+  const wondersSolved = await resolveWondersNear({ id: created.id, lat, lng: lng as number }, user.id);
+
   return NextResponse.json(
-    { id: created.id, earned: REWARD.discovery + (newCell ? REWARD.newCell : 0), newCell },
+    { id: created.id, earned: REWARD.discovery + (newCell ? REWARD.newCell : 0), newCell, wondersSolved },
     { status: 201 },
   );
 });

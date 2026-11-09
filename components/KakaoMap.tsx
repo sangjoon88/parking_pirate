@@ -6,7 +6,7 @@ import { guardColor } from "@/lib/format";
 import { loadKakao, type Kakao, type LatLng } from "@/lib/kakao";
 import { STALE_DAYS } from "@/lib/constants";
 import { FLEET_SIZE } from "@/lib/game";
-import type { RadioMessage, SpotSummary } from "@/lib/types";
+import type { RadioMessage, SpotSummary, Wonder } from "@/lib/types";
 import { YEOUIDO_CELLS } from "@/lib/yeouido";
 
 export type KakaoMapHandle = {
@@ -29,6 +29,9 @@ type Props = {
   fogExplored?: Set<string> | null;
   /** 무전기 쪽지 */
   radios?: RadioMessage[];
+  /** 궁금한 곳 ❓ */
+  wonders?: Wonder[];
+  onWonderTap?: (id: string) => void;
 };
 
 /** 무전 말풍선 (사용자 글은 textContent로 넣어 HTML 주입을 막는다) */
@@ -100,7 +103,10 @@ export default function KakaoMap({
   onReady,
   fogExplored = null,
   radios = [],
+  wonders = [],
+  onWonderTap,
 }: Props) {
+  const wonderRef = useRef<any[]>([]);
   const fogRef = useRef<any[]>([]);
   const radioRef = useRef<any[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -112,9 +118,9 @@ export default function KakaoMap({
   const [ready, setReady] = useState(false);
 
   // 최신 콜백을 이벤트 핸들러에서 쓰기 위해 ref로 보관
-  const cb = useRef({ onSpotTap, onLongPress, onReady });
+  const cb = useRef({ onSpotTap, onLongPress, onReady, onWonderTap });
   useEffect(() => {
-    cb.current = { onSpotTap, onLongPress, onReady };
+    cb.current = { onSpotTap, onLongPress, onReady, onWonderTap };
   });
 
   useImperativeHandle(ref, () => ({
@@ -279,6 +285,36 @@ export default function KakaoMap({
       return rect;
     });
   }, [ready, fogExplored]);
+
+  // 궁금한 곳 ❓
+  useEffect(() => {
+    const map = mapRef.current;
+    const kakao = kakaoRef.current;
+    if (!ready || !map || !kakao) return;
+    wonderRef.current.forEach((o) => o.setMap(null));
+    wonderRef.current = wonders.map((w) => {
+      const el = document.createElement("div");
+      el.setAttribute("data-spot", "wonder"); // 길게 누르기 대상에서 제외
+      el.style.cssText =
+        "transform:translateY(-50%);width:30px;height:30px;border-radius:50%;background:#7c3aed;border:3px solid " +
+        (w.mine ? "#f5c451" : "#fff") +
+        ";box-shadow:0 2px 6px rgba(0,0,0,.5);color:#fff;font:900 16px/24px sans-serif;text-align:center;cursor:pointer";
+      el.textContent = "?";
+      el.addEventListener("click", (e) => {
+        e.stopPropagation();
+        cb.current.onWonderTap?.(w.id);
+      });
+      const o = new kakao.maps.CustomOverlay({
+        position: new kakao.maps.LatLng(w.lat, w.lng),
+        content: el,
+        clickable: true,
+        yAnchor: 0.5,
+        zIndex: 4,
+      });
+      o.setMap(map);
+      return o;
+    });
+  }, [ready, wonders]);
 
   // 무전 말풍선
   useEffect(() => {

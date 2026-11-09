@@ -54,6 +54,10 @@ export const spots = pgTable("spots", {
   nickname: text("nickname"),
   /** 선원이 금화로 건 현상금 (확인한 사람이 받아감) */
   postedBounty: integer("posted_bounty").notNull().default(0),
+  /** 정박지 소개: 누구나 고칠 수 있는 설명 (입구, 층, 주의사항 등) */
+  description: text("description"),
+  descriptionBy: uuid("description_by").references((): AnyPgColumn => users.id),
+  descriptionAt: timestamp("description_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -133,6 +137,7 @@ export const doubloonLogs = pgTable(
         "duel_win",
         "duel_refund",
         "anniversary",
+        "wonder_solved",
       ],
     }).notNull(),
     refId: text("ref_id"),
@@ -213,4 +218,22 @@ export const radioMessages = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("radio_created_idx").on(t.createdAt)],
+);
+
+/** 궁금한 곳: 선원이 지도에 찍어 둔 ❓ (확인해 줄 사람을 기다림). 근처에 정박지가 등록되면 해결 */
+export const wonders = pgTable(
+  "wonders",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    lat: doublePrecision("lat").notNull(),
+    lng: doublePrecision("lng").notNull(),
+    note: text("note").notNull().default(""),
+    resolvedSpotId: uuid("resolved_spot_id").references(() => spots.id),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("wonders_open_idx").on(t.resolvedAt)],
 );

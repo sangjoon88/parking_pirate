@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { GUARD_LABELS, guardColor, timeAgo } from "@/lib/format";
-import { BOUNTY_POST, FLEET_SIZE, LEGEND_PARKINGS, STASH } from "@/lib/game";
+import { BOUNTY_POST, DESCRIPTION_MAX, FLEET_SIZE, LEGEND_PARKINGS, STASH } from "@/lib/game";
 import type { ActiveParking, SpotReport, SpotSummary } from "@/lib/types";
 import { AmountSheet } from "./feedback";
 import Sheet from "./Sheet";
@@ -22,7 +22,7 @@ type Props = {
 };
 
 type Detail = { spot: SpotSummary; reports: SpotReport[]; me: { id: string; balance: number } };
-type Sub = null | "bounty" | "stash" | "nickname";
+type Sub = null | "bounty" | "stash" | "nickname" | "description";
 
 const AMOUNTS = [10, 30, 50, 100] as const;
 
@@ -101,6 +101,12 @@ export default function SpotSheet({
     );
   }
 
+  if (sub === "description") {
+    return (
+      <DescriptionSheet spot={spot} onClose={() => setSub(null)} onDone={() => changed("📝 정박지 소개를 저장했어요")} />
+    );
+  }
+
   if (sub === "nickname") {
     return <NicknameSheet spot={spot} onClose={() => setSub(null)} onDone={() => changed("✨ 전설의 정박지에 별명을 붙였어요")} />;
   }
@@ -129,7 +135,7 @@ export default function SpotSheet({
               </div>
             ) : (
               <Button onClick={start} disabled={busy || closed || !!parking}>
-                {busy ? "위치 확인 중…" : parking ? "다른 곳 정박 중" : closed ? "닫힌 정박지" : "⚓ 정박 시작"}
+                {busy ? "정박 중…" : parking ? "다른 곳 정박 중" : closed ? "닫힌 정박지" : "⚓ 정박 시작"}
               </Button>
             )}
             <Button variant="ghost" onClick={() => onWriteReport(spot)}>
@@ -175,6 +181,28 @@ export default function SpotSheet({
           sub={spot.guardAvg == null ? "정보 없음" : GUARD_LABELS[Math.round(spot.guardAvg)]}
         />
         <Stat label="마지막 확인" value={timeAgo(spot.lastConfirmedAt)} small />
+      </div>
+
+      {/* 정박지 소개: 누구나 고칠 수 있음 */}
+      <div className="mt-3 rounded-xl bg-sea-800 px-3 py-2.5">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold text-slate-300">📝 정박지 소개</h3>
+          <button onClick={() => setSub("description")} className="-mr-1 h-8 px-2 text-xs font-bold text-gold-400">
+            {spot.description ? "고치기" : "쓰기"}
+          </button>
+        </div>
+        {spot.description ? (
+          <>
+            <p className="mt-1 text-sm break-words whitespace-pre-wrap">{spot.description}</p>
+            {spot.descriptionBy && spot.descriptionAt && (
+              <p className="mt-1 text-[11px] text-slate-500">
+                마지막 수정 {spot.descriptionBy} · {timeAgo(spot.descriptionAt)}
+              </p>
+            )}
+          </>
+        ) : (
+          <p className="mt-1 text-sm text-slate-500">입구, 층, 주의할 점 같은 걸 남겨 주세요. 누구나 고칠 수 있어요.</p>
+        )}
       </div>
 
       {/* 영주 · 발견자 */}
@@ -318,6 +346,57 @@ function NicknameSheet({ spot, onClose, onDone }: { spot: SpotSummary; onClose: 
         placeholder="예: 해적의 안식처"
         className="h-12 w-full rounded-xl border border-sea-600 bg-sea-800 px-4 text-white outline-none focus:border-gold-400"
       />
+      <ErrorText>{error}</ErrorText>
+    </Sheet>
+  );
+}
+
+function DescriptionSheet({ spot, onClose, onDone }: { spot: SpotSummary; onClose: () => void; onDone: () => void }) {
+  const [text, setText] = useState(spot.description ?? "");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  return (
+    <Sheet
+      onClose={onClose}
+      title={
+        <>
+          <p className="text-xs text-slate-400">📝 정박지 소개</p>
+          <h2 className="truncate text-lg font-black">{spot.name}</h2>
+        </>
+      }
+      footer={
+        <Button
+          className="w-full"
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            setError("");
+            try {
+              await api(`/api/spots/${spot.id}/description`, { method: "POST", json: { description: text } });
+              onDone();
+            } catch (e) {
+              setError((e as Error).message);
+              setBusy(false);
+            }
+          }}
+        >
+          {busy ? "저장 중…" : "저장"}
+        </Button>
+      }
+    >
+      <p className="mb-2 text-xs text-slate-400">
+        항해 일지와 달리 한 곳에 하나만 있는 설명이에요. 누구나 고칠 수 있고, 마지막으로 고친 선원이 표시돼요.
+      </p>
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value.slice(0, DESCRIPTION_MAX))}
+        rows={6}
+        placeholder={"예:\n- 정문 말고 후문 입구로\n- 지하 1층 방문자 칸 넉넉함\n- 밤 11시 이후 경비 순찰"}
+        className="w-full rounded-xl border border-sea-600 bg-sea-800 px-3 py-2 text-white outline-none placeholder:text-slate-500 focus:border-gold-400"
+      />
+      <div className="mt-1 pb-1 text-right text-xs text-slate-500">
+        {text.length}/{DESCRIPTION_MAX}
+      </div>
       <ErrorText>{error}</ErrorText>
     </Sheet>
   );
