@@ -69,7 +69,6 @@ function pinHtml(s: SpotSummary, selected: boolean) {
     `<span style="position:absolute;${pos};height:20px;padding:0 6px;border-radius:10px;background:${bg};color:${fg};font:800 11px/20px sans-serif;white-space:nowrap;border:2px solid #07111f;${extra}">${text}</span>`;
   const count = s.parkedCount > 0 ? tag("top:-6px;right:-10px", "#f5c451", "#07111f", String(s.parkedCount)) : "";
   const bounty = s.bounty > 0 ? tag("bottom:-8px;left:50%;transform:translateX(-50%)", "#16a34a", "#fff", `💰${s.bounty}`) : "";
-  const crown = s.discovererIsKing ? `<span style="position:absolute;top:-14px;left:2px;font-size:16px">👑</span>` : "";
   const navy = s.navyAlert
     ? tag("top:-6px;left:-12px", "#dc2626", "#fff", "⚠", "animation:pp-blink 1s steps(2) infinite")
     : "";
@@ -88,7 +87,7 @@ function pinHtml(s: SpotSummary, selected: boolean) {
       <div style="opacity:${stale ? 0.45 : 1};width:34px;height:34px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:${color};border:3px solid ${border};box-shadow:0 2px 6px rgba(0,0,0,.5)${glow};display:flex;align-items:center;justify-content:center">
         <span style="transform:rotate(45deg);font-size:16px;line-height:1">${icon}</span>
       </div>
-      ${treasure}${crown}${count}${navy}${lord}${bounty}
+      ${treasure}${count}${navy}${lord}${bounty}
     </div>`;
 }
 

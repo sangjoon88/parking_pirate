@@ -58,7 +58,7 @@ export default function MapScreen({ initialFog = false }: { initialFog?: boolean
   const [fog, setFog] = useState(initialFog);
   const [hint, setHint] = useState(false);
   const lastAlertRef = useRef<string | null>(null);
-  const [toastNode, showToast] = useToast();
+  const [toastNode, showToast] = useToast("bottom-40"); // 하단 도구 막대 위로
   const [confirmNode, confirm] = useConfirm();
 
   const explored = useMemo(() => exploredCells(spots), [spots]);
@@ -178,6 +178,12 @@ export default function MapScreen({ initialFog = false }: { initialFog?: boolean
     }
   }
 
+  function startPlacing(purpose: Purpose) {
+    dismissHint();
+    setSelectedId(null);
+    setMode({ kind: "placing", purpose });
+  }
+
   /** 메뉴에서 고른 뒤: 위치가 정해져 있으면 바로 입력, 아니면 지도로 위치 고르기 */
   function choose(purpose: Purpose, position: LatLng | null) {
     if (!position) return setMode({ kind: "placing", purpose });
@@ -275,7 +281,7 @@ export default function MapScreen({ initialFog = false }: { initialFog?: boolean
             <div className="mb-1 font-bold text-gold-400">☠ 주차해적단 사용법</div>
             <ul className="space-y-0.5 text-slate-300">
               <li>· 핀을 누르면 정박지 정보와 [정박 시작]</li>
-              <li>· [+ 찍기]나 지도 길게 누르기로 정박지·궁금한 곳·무전</li>
+              <li>· 아래 [새 정박지] [궁금한 곳] [무전]으로 지도에 찍기 (길게 눌러도 돼요)</li>
               <li>· 📦 보물상자, 💰 현상금, ❓ 궁금한 곳을 노려 보세요</li>
             </ul>
             <button onClick={dismissHint} className="mt-2 h-9 w-full rounded-lg bg-sea-700 text-xs font-bold">
@@ -292,25 +298,11 @@ export default function MapScreen({ initialFog = false }: { initialFog?: boolean
         </div>
       )}
 
-      {/* 왼쪽 아래: 보기 전환 */}
-      {!placing && (
-        <div className="absolute bottom-4 left-3 z-20">
-          <RoundButton label="해도 보기" active={fog} onClick={() => setFog((f) => !f)}>
-            🗺️
-          </RoundButton>
-        </div>
-      )}
-
-      {/* 오른쪽 아래: 주요 동작 (한 손 조작) */}
-      <div className="absolute right-3 bottom-4 z-20 flex flex-col items-end gap-3">
-        {!placing && (
-          <RoundButton label="내 위치" onClick={() => void locateMe()} disabled={locating}>
-            {locating ? "…" : "🎯"}
-          </RoundButton>
-        )}
+      {/* 하단 도구 막대: 버튼마다 이름표. 자주 쓰는 '정박지'는 엄지가 닿는 오른쪽 끝 */}
+      <div className="absolute inset-x-3 bottom-3 z-20">
         {placing ? (
-          <div className="flex gap-2">
-            <button onClick={() => setMode({ kind: "idle" })} className="h-14 rounded-full bg-sea-700 px-5 font-bold shadow-lg">
+          <div className="grid grid-cols-[auto_1fr] gap-2">
+            <button onClick={() => setMode({ kind: "idle" })} className="h-14 rounded-2xl bg-sea-700 px-6 font-bold shadow-lg">
               취소
             </button>
             <button
@@ -318,22 +310,24 @@ export default function MapScreen({ initialFog = false }: { initialFog?: boolean
                 const c = mapRef.current?.getCenter();
                 if (c) choose(mode.purpose, c);
               }}
-              className="h-14 rounded-full bg-gold-400 px-5 font-black text-sea-950 shadow-lg"
+              className="h-14 rounded-2xl bg-gold-400 font-black text-sea-950 shadow-lg"
             >
               이 위치로
             </button>
           </div>
         ) : (
-          <button
-            onClick={() => {
-              dismissHint();
-              setSelectedId(null);
-              setMode({ kind: "menu", position: null });
-            }}
-            className="h-14 rounded-full bg-gold-400 px-6 text-lg font-black text-sea-950 shadow-lg active:bg-gold-500"
-          >
-            + 찍기
-          </button>
+          <div className="grid grid-cols-5 gap-1 rounded-2xl bg-sea-900/95 p-1.5 shadow-xl backdrop-blur">
+            <ToolButton icon="🗺️" label="해도" active={fog} onClick={() => setFog((f) => !f)} />
+            <ToolButton icon="📻" label="무전" onClick={() => startPlacing("radio")} />
+            <ToolButton icon="❓" label="궁금한 곳" onClick={() => startPlacing("wonder")} />
+            <ToolButton
+              icon={locating ? "…" : <LocateIcon />}
+              label="내 위치"
+              disabled={locating}
+              onClick={() => void locateMe()}
+            />
+            <ToolButton icon="☠" label="새 정박지" primary onClick={() => startPlacing("spot")} />
+          </div>
         )}
       </div>
 
@@ -468,31 +462,47 @@ export default function MapScreen({ initialFog = false }: { initialFog?: boolean
   );
 }
 
-function RoundButton({
+function ToolButton({
+  icon,
   label,
   active,
+  primary,
   disabled,
   onClick,
-  children,
 }: {
+  icon: React.ReactNode;
   label: string;
   active?: boolean;
+  primary?: boolean;
   disabled?: boolean;
   onClick: () => void;
-  children: React.ReactNode;
 }) {
+  const tone = primary
+    ? "bg-gold-400 text-sea-950 active:bg-gold-500"
+    : active
+      ? "bg-gold-400/20 text-gold-400"
+      : "text-slate-200 active:bg-sea-700";
   return (
     <button
       onClick={onClick}
       disabled={disabled}
-      aria-label={label}
-      title={label}
-      className={`flex h-14 w-14 items-center justify-center rounded-full text-2xl shadow-lg disabled:opacity-60 ${
-        active ? "bg-gold-400" : "bg-sea-900 active:bg-sea-700"
-      }`}
+      aria-pressed={active}
+      className={`flex h-14 flex-col items-center justify-center gap-0.5 rounded-xl disabled:opacity-60 ${tone}`}
     >
-      {children}
+      <span className="flex h-6 items-center text-xl leading-none">{icon}</span>
+      <span className="text-[11px] leading-none font-bold">{label}</span>
     </button>
+  );
+}
+
+/** 내 위치 아이콘 (과녁 모양 대신 흔히 쓰는 조준선) */
+function LocateIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
+      <circle cx="12" cy="12" r="6.5" />
+      <circle cx="12" cy="12" r="2.2" fill="currentColor" />
+      <path d="M12 1.5v3.5M12 19v3.5M1.5 12H5M19 12h3.5" strokeLinecap="round" />
+    </svg>
   );
 }
 

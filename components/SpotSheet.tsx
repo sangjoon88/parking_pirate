@@ -223,7 +223,6 @@ export default function SpotSheet({
         <div className="flex items-center justify-between px-3 py-2">
           <span className="text-slate-400">☠ 발견</span>
           <span className="font-semibold">
-            {spot.discovererIsKing && "👑 "}
             {spot.discoverer}
             <span className="ml-1 text-xs font-normal text-slate-400">{timeAgo(spot.createdAt)}</span>
           </span>
