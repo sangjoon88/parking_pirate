@@ -7,6 +7,7 @@ import { BOUNTY_POST, DESCRIPTION_MAX, FLEET_SIZE, LEGEND_PARKINGS, STASH } from
 import type { ActiveParking, SpotPhoto, SpotReport, SpotSummary } from "@/lib/types";
 import { AmountSheet } from "./feedback";
 import { PhotoViewer, photoUrl, SpotPhotoStrip } from "./Photos";
+import ReportSheet from "./ReportSheet";
 import Sheet from "./Sheet";
 import { Button, ErrorText } from "./ui";
 
@@ -26,6 +27,8 @@ type Detail = { spot: SpotSummary; reports: SpotReport[]; photos: SpotPhoto[]; m
 type Sub = null | "bounty" | "stash" | "nickname" | "description";
 
 const AMOUNTS = [10, 30, 50, 100] as const;
+/** 처음에 보여 주는 일지 수 (나머지는 "이전 일지 더 보기") */
+const REPORTS_PREVIEW = 3;
 
 export default function SpotSheet({
   spotId,
@@ -43,6 +46,8 @@ export default function SpotSheet({
   const [sub, setSub] = useState<Sub>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [viewing, setViewing] = useState<SpotReport | null>(null);
+  const [editing, setEditing] = useState<SpotReport | null>(null);
+  const [showAllReports, setShowAllReports] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -98,6 +103,26 @@ export default function SpotSheet({
         onSubmit={async (amount) => {
           await api(`/api/spots/${spot.id}/${sub}`, { method: "POST", json: { amount } });
           changed(isBounty ? `💰 현상금 ${amount}두블룬을 걸었어요` : `🪙 보물 ${amount}두블룬을 묻었어요. 쉿!`);
+        }}
+      />
+    );
+  }
+
+  if (editing) {
+    return (
+      <ReportSheet
+        spot={spot}
+        editing={editing}
+        onClose={() => setEditing(null)}
+        onDone={({ closed, photoFailed }) => {
+          setEditing(null);
+          changed(
+            closed
+              ? "🚧 차단기 제보가 쌓여 정박지가 닫혔어요"
+              : photoFailed
+                ? "📜 일지는 고쳤는데 사진을 바꾸지 못했어요"
+                : "📜 항해 일지를 고쳤어요",
+          );
         }}
       />
     );
@@ -270,23 +295,34 @@ export default function SpotSheet({
       )}
 
       <div className="mt-4 pb-1">
-        <h3 className="mb-2 text-sm font-bold text-slate-300">최근 항해 일지</h3>
+        <h3 className="mb-2 text-sm font-bold text-slate-300">
+          항해 일지{reports && reports.length > 0 && <span className="ml-1 font-normal text-slate-500">{reports.length}개</span>}
+        </h3>
         {reports === null ? (
           <p className="text-sm text-slate-500">불러오는 중…</p>
         ) : reports.length === 0 ? (
           <p className="text-sm text-slate-500">아직 일지가 없어요. 첫 일지를 남겨 주세요.</p>
         ) : (
           <ul className="space-y-2">
-            {reports.map((r) => (
+            {(showAllReports ? reports : reports.slice(0, REPORTS_PREVIEW)).map((r) => (
               <li key={r.id} className="rounded-xl bg-sea-800 px-3 py-2">
                 <div className="flex flex-wrap items-center gap-x-2 text-xs text-slate-400">
                   <b className="text-slate-200">{r.nickname}</b>
                   <span>{timeAgo(r.createdAt)}</span>
+                  {r.updatedAt && <span className="text-slate-500">(고침)</span>}
                   {r.guardLevel != null && (
                     <span style={{ color: guardColor(r.guardLevel, false) }}>경계 {r.guardLevel}</span>
                   )}
                   {r.gateStatus === "no_gate" && <span className="text-green-400">차단기 없음</span>}
                   {r.gateStatus === "gate_installed" && <span className="text-red-400">차단기 생김</span>}
+                  {r.mine && (
+                    <button
+                      onClick={() => setEditing(r)}
+                      className="-my-1 ml-auto h-8 px-1 text-xs font-bold text-gold-400"
+                    >
+                      ✏️ 고치기
+                    </button>
+                  )}
                 </div>
                 {r.note && <p className="mt-1 text-sm break-words whitespace-pre-wrap">{r.note}</p>}
                 {r.photoId && (
@@ -297,6 +333,16 @@ export default function SpotSheet({
                 )}
               </li>
             ))}
+            {reports.length > REPORTS_PREVIEW && (
+              <li>
+                <button
+                  onClick={() => setShowAllReports((v) => !v)}
+                  className="min-h-11 w-full rounded-xl border border-sea-600 text-sm font-bold text-slate-300"
+                >
+                  {showAllReports ? "접기" : `이전 일지 ${reports.length - REPORTS_PREVIEW}개 더 보기`}
+                </button>
+              </li>
+            )}
           </ul>
         )}
       </div>

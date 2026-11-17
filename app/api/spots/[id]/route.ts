@@ -7,6 +7,8 @@ import { balanceOf } from "@/lib/doubloons";
 import { listSpots } from "@/lib/spots";
 
 const UUID = /^[0-9a-f-]{36}$/i;
+/** 시트에 내려보내는 항해 일지 수 (선원 20명 규모라 사실상 전부) */
+const REPORT_LIST_MAX = 200;
 
 export const GET = handle(async (_req: Request, ctx: { params: Promise<{ id: string }> }) => {
   const user = await requireUser();
@@ -25,6 +27,8 @@ export const GET = handle(async (_req: Request, ctx: { params: Promise<{ id: str
         gateStatus: spotReports.gateStatus,
         note: spotReports.note,
         createdAt: spotReports.createdAt,
+        updatedAt: spotReports.updatedAt,
+        userId: spotReports.userId,
         nickname: users.nickname,
         photoId: photos.id,
       })
@@ -33,7 +37,7 @@ export const GET = handle(async (_req: Request, ctx: { params: Promise<{ id: str
       .leftJoin(photos, eq(photos.reportId, spotReports.id))
       .where(eq(spotReports.spotId, id))
       .orderBy(desc(spotReports.createdAt))
-      .limit(3),
+      .limit(REPORT_LIST_MAX),
     // 정박지 소개 사진 (사진 바이트는 빼고 목록만)
     db
       .select({
@@ -53,7 +57,7 @@ export const GET = handle(async (_req: Request, ctx: { params: Promise<{ id: str
 
   return NextResponse.json({
     spot,
-    reports,
+    reports: reports.map(({ userId, ...r }) => ({ ...r, mine: userId === user.id })),
     photos: spotPhotos.map(({ userId, ...p }) => ({ ...p, canDelete: userId === user.id || user.role === "admin" })),
     me: { id: user.id, balance },
   });

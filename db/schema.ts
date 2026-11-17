@@ -76,6 +76,8 @@ export const spotReports = pgTable(
     gateStatus: text("gate_status", { enum: ["no_gate", "gate_installed"] }),
     note: text("note").notNull().default(""),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    /** 쓴 선원이 고친 시각 (안 고쳤으면 null) */
+    updatedAt: timestamp("updated_at", { withTimezone: true }),
   },
   (t) => [
     index("spot_reports_spot_idx").on(t.spotId, t.createdAt),

@@ -41,8 +41,11 @@ export type SpotReport = {
   gateStatus: "no_gate" | "gate_installed" | null;
   note: string;
   createdAt: string;
+  updatedAt: string | null;
   nickname: string;
   photoId: string | null;
+  /** 내가 쓴 일지면 고칠 수 있음 */
+  mine: boolean;
 };
 
 export type SpotPhoto = {
