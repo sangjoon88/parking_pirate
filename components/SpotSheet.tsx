@@ -130,25 +130,21 @@ export default function SpotSheet({
 
   if (editing) {
     return (
-      <>
-        <ReportSheet
-          spot={spot}
-          editing={editing}
-          onDelete={() => deleteReport(editing)}
-          onClose={() => setEditing(null)}
-          onDone={({ closed, photoFailed }) => {
-            setEditing(null);
-            changed(
-              closed
-                ? "🚧 차단기 제보가 쌓여 정박지가 닫혔어요"
-                : photoFailed
-                  ? "📜 일지는 고쳤는데 사진을 바꾸지 못했어요"
-                  : "📜 항해 일지를 고쳤어요",
-            );
-          }}
-        />
-        {confirmNode}
-      </>
+      <ReportSheet
+        spot={spot}
+        editing={editing}
+        onClose={() => setEditing(null)}
+        onDone={({ closed, photoFailed }) => {
+          setEditing(null);
+          changed(
+            closed
+              ? "🚧 차단기 제보가 쌓여 정박지가 닫혔어요"
+              : photoFailed
+                ? "📜 일지는 고쳤는데 사진을 바꾸지 못했어요"
+                : "📜 항해 일지를 고쳤어요",
+          );
+        }}
+      />
     );
   }
 
@@ -339,22 +335,19 @@ export default function SpotSheet({
                   )}
                   {r.gateStatus === "no_gate" && <span className="text-green-400">차단기 없음</span>}
                   {r.gateStatus === "gate_installed" && <span className="text-red-400">차단기 생김</span>}
-                  {r.mine ? (
-                    <button
-                      onClick={() => setEditing(r)}
-                      className="-my-1 ml-auto h-8 px-1 text-xs font-bold text-gold-400"
-                    >
-                      ✏️ 고치기
-                    </button>
-                  ) : (
-                    r.canDelete && (
-                      <button
-                        onClick={() => deleteReport(r)}
-                        className="-my-1 ml-auto h-8 px-1 text-xs font-bold text-red-400"
-                      >
-                        🗑 지우기
-                      </button>
-                    )
+                  {(r.mine || r.canDelete) && (
+                    <span className="-my-1 ml-auto flex">
+                      {r.mine && (
+                        <button onClick={() => setEditing(r)} className="h-8 px-1.5 text-[11px] font-bold text-gold-400">
+                          고치기
+                        </button>
+                      )}
+                      {r.canDelete && (
+                        <button onClick={() => deleteReport(r)} className="h-8 px-1.5 text-[11px] font-bold text-red-400">
+                          지우기
+                        </button>
+                      )}
+                    </span>
                   )}
                 </div>
                 {r.note && <p className="mt-1 text-sm break-words whitespace-pre-wrap">{r.note}</p>}
