@@ -46,6 +46,8 @@ export type SpotReport = {
   photoId: string | null;
   /** 내가 쓴 일지면 고칠 수 있음 */
   mine: boolean;
+  /** 쓴 선원 또는 관리자면 지울 수 있음 */
+  canDelete: boolean;
 };
 
 export type SpotPhoto = {

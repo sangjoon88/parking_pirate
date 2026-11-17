@@ -15,12 +15,15 @@ export default function ReportSheet({
   spot,
   weather,
   editing,
+  onDelete,
   onClose,
   onDone,
 }: {
   spot: SpotSummary;
   weather?: WeatherId;
   editing?: SpotReport;
+  /** 고치기 화면에서 일지 지우기 */
+  onDelete?: () => void;
   onClose: () => void;
   onDone: (result: { closed: boolean; earned: number; bounty: number; photoFailed: boolean }) => void;
 }) {
@@ -174,6 +177,15 @@ export default function ReportSheet({
       <div className="mt-3 pb-1">
         <ErrorText>{error}</ErrorText>
       </div>
+      {editing && onDelete && (
+        <button
+          onClick={onDelete}
+          disabled={busy}
+          className="mt-2 mb-1 min-h-11 w-full rounded-xl border border-red-500/60 text-sm font-bold text-red-400"
+        >
+          🗑 이 일지 지우기
+        </button>
+      )}
     </Sheet>
   );
 }

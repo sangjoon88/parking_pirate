@@ -57,7 +57,11 @@ export const GET = handle(async (_req: Request, ctx: { params: Promise<{ id: str
 
   return NextResponse.json({
     spot,
-    reports: reports.map(({ userId, ...r }) => ({ ...r, mine: userId === user.id })),
+    reports: reports.map(({ userId, ...r }) => ({
+      ...r,
+      mine: userId === user.id,
+      canDelete: userId === user.id || user.role === "admin",
+    })),
     photos: spotPhotos.map(({ userId, ...p }) => ({ ...p, canDelete: userId === user.id || user.role === "admin" })),
     me: { id: user.id, balance },
   });

@@ -5,7 +5,7 @@ import { api } from "@/lib/api";
 import { GUARD_LABELS, guardColor, timeAgo } from "@/lib/format";
 import { BOUNTY_POST, DESCRIPTION_MAX, FLEET_SIZE, LEGEND_PARKINGS, STASH } from "@/lib/game";
 import type { ActiveParking, SpotPhoto, SpotReport, SpotSummary } from "@/lib/types";
-import { AmountSheet } from "./feedback";
+import { AmountSheet, useConfirm } from "./feedback";
 import { PhotoViewer, photoUrl, SpotPhotoStrip } from "./Photos";
 import ReportSheet from "./ReportSheet";
 import Sheet from "./Sheet";
@@ -48,6 +48,7 @@ export default function SpotSheet({
   const [viewing, setViewing] = useState<SpotReport | null>(null);
   const [editing, setEditing] = useState<SpotReport | null>(null);
   const [showAllReports, setShowAllReports] = useState(false);
+  const [confirmNode, confirm] = useConfirm();
 
   useEffect(() => {
     let alive = true;
@@ -85,6 +86,25 @@ export default function SpotSheet({
     onChanged(msg);
   };
 
+  async function deleteReport(r: SpotReport) {
+    const ok = await confirm({
+      title: "항해 일지를 지울까요?",
+      message: r.mine
+        ? "붙은 사진도 함께 지워져요. 이미 받은 금화는 그대로예요."
+        : `${r.nickname}님의 일지예요. 붙은 사진도 함께 지워져요.`,
+      confirmLabel: "지우기",
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      await api(`/api/reports/${r.id}`, { method: "DELETE" });
+      setEditing(null);
+      changed("🗑 항해 일지를 지웠어요");
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
   if (sub === "bounty" || sub === "stash") {
     const isBounty = sub === "bounty";
     const range = isBounty ? BOUNTY_POST : STASH;
@@ -110,21 +130,25 @@ export default function SpotSheet({
 
   if (editing) {
     return (
-      <ReportSheet
-        spot={spot}
-        editing={editing}
-        onClose={() => setEditing(null)}
-        onDone={({ closed, photoFailed }) => {
-          setEditing(null);
-          changed(
-            closed
-              ? "🚧 차단기 제보가 쌓여 정박지가 닫혔어요"
-              : photoFailed
-                ? "📜 일지는 고쳤는데 사진을 바꾸지 못했어요"
-                : "📜 항해 일지를 고쳤어요",
-          );
-        }}
-      />
+      <>
+        <ReportSheet
+          spot={spot}
+          editing={editing}
+          onDelete={() => deleteReport(editing)}
+          onClose={() => setEditing(null)}
+          onDone={({ closed, photoFailed }) => {
+            setEditing(null);
+            changed(
+              closed
+                ? "🚧 차단기 제보가 쌓여 정박지가 닫혔어요"
+                : photoFailed
+                  ? "📜 일지는 고쳤는데 사진을 바꾸지 못했어요"
+                  : "📜 항해 일지를 고쳤어요",
+            );
+          }}
+        />
+        {confirmNode}
+      </>
     );
   }
 
@@ -315,13 +339,22 @@ export default function SpotSheet({
                   )}
                   {r.gateStatus === "no_gate" && <span className="text-green-400">차단기 없음</span>}
                   {r.gateStatus === "gate_installed" && <span className="text-red-400">차단기 생김</span>}
-                  {r.mine && (
+                  {r.mine ? (
                     <button
                       onClick={() => setEditing(r)}
                       className="-my-1 ml-auto h-8 px-1 text-xs font-bold text-gold-400"
                     >
                       ✏️ 고치기
                     </button>
+                  ) : (
+                    r.canDelete && (
+                      <button
+                        onClick={() => deleteReport(r)}
+                        className="-my-1 ml-auto h-8 px-1 text-xs font-bold text-red-400"
+                      >
+                        🗑 지우기
+                      </button>
+                    )
                   )}
                 </div>
                 {r.note && <p className="mt-1 text-sm break-words whitespace-pre-wrap">{r.note}</p>}
@@ -353,6 +386,7 @@ export default function SpotSheet({
           onClose={() => setViewing(null)}
         />
       )}
+      {confirmNode}
     </Sheet>
   );
 }
