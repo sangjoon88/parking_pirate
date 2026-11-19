@@ -4,7 +4,7 @@
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
 import { loadKakao, type Kakao, type LatLng } from "@/lib/kakao";
 import type { RadioMessage, SpotSummary, Wonder } from "@/lib/types";
-import { PIN_X_ANCHOR, pinHtml } from "@/lib/pinHtml";
+import { clusterHtml, PIN_X_ANCHOR, pinHtml } from "@/lib/pinHtml";
 import { PX_ICONS, PX_PALETTE } from "@/lib/pixelIcons";
 import { compassSvg, spriteSvg, wonderSvg } from "@/lib/pixelSprites";
 import { YEOUIDO_CELLS } from "@/lib/yeouido";
@@ -58,6 +58,47 @@ function radioEl(m: RadioMessage): HTMLElement {
 
 const LONG_PRESS_MS = 600;
 
+/** 이 지도 단계부터(숫자가 클수록 멀리 봄) 작은 깃발로 */
+const COMPACT_LEVEL = 5;
+
+/**
+ * 화면에서 가까운 정박지끼리 묶기 (선원 20명 규모라 단순 탐욕 묶음으로 충분).
+ * 선택된 정박지는 묶지 않는다. 정박 중인 곳이 묶음의 기준점이 되도록 먼저 고른다.
+ */
+function clusterSpots(
+  spots: SpotSummary[],
+  selectedId: string | null,
+  radius: number,
+  toPoint: (s: SpotSummary) => { x: number; y: number },
+): SpotSummary[][] {
+  const pts = new Map(spots.map((s) => [s.id, toPoint(s)]));
+  const order = [...spots].sort(
+    (a, b) => b.parkedCount - a.parkedCount || Number(a.status === "closed") - Number(b.status === "closed"),
+  );
+  const used = new Set<string>();
+  const groups: SpotSummary[][] = [];
+  for (const s of order) {
+    if (used.has(s.id)) continue;
+    used.add(s.id);
+    if (s.id === selectedId) {
+      groups.push([s]);
+      continue;
+    }
+    const p = pts.get(s.id)!;
+    const g = [s];
+    for (const o of order) {
+      if (used.has(o.id) || o.id === selectedId) continue;
+      const q = pts.get(o.id)!;
+      if (Math.hypot(p.x - q.x, p.y - q.y) < radius) {
+        g.push(o);
+        used.add(o.id);
+      }
+    }
+    groups.push(g);
+  }
+  return groups;
+}
+
 export default function KakaoMap({
   ref,
   initialCenter,
@@ -82,6 +123,7 @@ export default function KakaoMap({
   const meRef = useRef<any>(null);
   const [error, setError] = useState("");
   const [ready, setReady] = useState(false);
+  const [level, setLevel] = useState(initialLevel);
 
   // 최신 콜백을 이벤트 핸들러에서 쓰기 위해 ref로 보관
   const cb = useRef({ onSpotTap, onLongPress, onReady, onWonderTap });
@@ -180,6 +222,8 @@ export default function KakaoMap({
           level: initialLevel,
         });
         mapRef.current = map;
+        // 확대·축소하면 깃발 크기와 묶음을 다시 계산
+        kakao.maps.event.addListener(map, "zoom_changed", () => setLevel(map.getLevel()));
         // 데스크톱: 오른쪽 클릭으로 등록
         kakao.maps.event.addListener(map, "rightclick", (e: any) => {
           cb.current.onLongPress({ lat: e.latLng.getLat(), lng: e.latLng.getLng() });
@@ -207,26 +251,61 @@ export default function KakaoMap({
     const kakao = kakaoRef.current;
     if (!ready || !map || !kakao) return;
     overlaysRef.current.forEach((o) => o.setMap(null));
-    overlaysRef.current = spots.map((s) => {
+
+    // 멀리서 볼수록 작은 깃발, 화면에서 겹치는 깃발은 묶음 하나로
+    const compact = level >= COMPACT_LEVEL;
+    const proj = map.getProjection();
+    const groups = clusterSpots(spots, selectedId, compact ? 30 : 48, (s) => {
+      const p = proj.containerPointFromCoords(new kakao.maps.LatLng(s.lat, s.lng));
+      return { x: p.x, y: p.y };
+    });
+
+    overlaysRef.current = groups.map((g) => {
       const wrap = document.createElement("div");
-      wrap.innerHTML = pinHtml(s, s.id === selectedId);
+      if (g.length === 1) {
+        const s = g[0];
+        const selected = s.id === selectedId;
+        wrap.innerHTML = pinHtml(s, selected, compact && !selected);
+        const el = wrap.firstElementChild as HTMLElement;
+        el.addEventListener("click", (e) => {
+          e.stopPropagation();
+          cb.current.onSpotTap(s.id);
+        });
+        const overlay = new kakao.maps.CustomOverlay({
+          position: new kakao.maps.LatLng(s.lat, s.lng),
+          content: el,
+          clickable: true,
+          xAnchor: PIN_X_ANCHOR,
+          yAnchor: 1, // 깃대 받침이 실제 위치
+          zIndex: selected ? 10 : s.status === "closed" ? 2 : 3,
+        });
+        overlay.setMap(map);
+        return overlay;
+      }
+      // 묶음: 누르면 묶인 정박지가 다 보이게 확대
+      wrap.innerHTML = clusterHtml(g);
       const el = wrap.firstElementChild as HTMLElement;
       el.addEventListener("click", (e) => {
         e.stopPropagation();
-        cb.current.onSpotTap(s.id);
+        const bounds = new kakao.maps.LatLngBounds();
+        g.forEach((s) => bounds.extend(new kakao.maps.LatLng(s.lat, s.lng)));
+        const before = map.getLevel();
+        map.setBounds(bounds, 80, 40, 160, 40);
+        // 거의 같은 자리라 확대가 안 되면 두 단계 확대
+        if (map.getLevel() >= before) map.setLevel(Math.max(1, before - 2), { anchor: bounds.getCenter() });
       });
       const overlay = new kakao.maps.CustomOverlay({
-        position: new kakao.maps.LatLng(s.lat, s.lng),
+        position: new kakao.maps.LatLng(g.reduce((n, s) => n + s.lat, 0) / g.length, g.reduce((n, s) => n + s.lng, 0) / g.length),
         content: el,
         clickable: true,
-        xAnchor: PIN_X_ANCHOR,
-        yAnchor: 1, // 깃대 받침이 실제 위치
-        zIndex: s.id === selectedId ? 10 : s.status === "closed" ? 2 : 3,
+        xAnchor: 0.5,
+        yAnchor: 1,
+        zIndex: 6,
       });
       overlay.setMap(map);
       return overlay;
     });
-  }, [ready, spots, selectedId]);
+  }, [ready, spots, selectedId, level]);
 
   // 해도(안개) 그리기: 안 밝혀진 칸은 어둡게, 밝혀진 칸은 금색 테두리
   useEffect(() => {

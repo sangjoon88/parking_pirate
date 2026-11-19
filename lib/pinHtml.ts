@@ -15,6 +15,7 @@ import { SHIP_PALETTE, SHIP_ROWS } from "./shipSprites";
 import type { SpotSummary } from "./types";
 
 export const PIN_SCALE = 3;
+export const COMPACT_SCALE = 2;
 const FLAG_W = 16;
 /** 깃대 받침 가운데 (16칸 중 2.5칸) */
 export const PIN_X_ANCHOR = 2.5 / FLAG_W;
@@ -146,29 +147,33 @@ export function isStale(s: SpotSummary, now = Date.now()): boolean {
   return !s.lastConfirmedAt || now - new Date(s.lastConfirmedAt).getTime() > STALE_DAYS * 86400_000;
 }
 
-export function pinHtml(s: SpotSummary, selected: boolean): string {
+/**
+ * compact: 지도를 멀리서 볼 때 쓰는 작은 깃발 (배는 숨기고 태그는 아이콘 위주).
+ * 깃발 그림 비율이 같아서 PIN_X_ANCHOR는 그대로 맞는다.
+ */
+export function pinHtml(s: SpotSummary, selected: boolean, compact = false): string {
   const closed = s.status === "closed";
   const color = pirateColor(s.guardAvg, closed);
-  const px = PIN_SCALE;
+  const px = compact ? COMPACT_SCALE : PIN_SCALE;
   const shadow = s.legendary
     ? "drop-shadow(0 0 5px rgba(245,196,81,.95)) drop-shadow(2px 2px 0 rgba(0,0,0,.5))"
     : "drop-shadow(2px 2px 0 rgba(0,0,0,.5))";
 
   // 펄럭임: 두 장면을 번갈아 (닫힌 깃발은 가만히)
   const flag = closed
-    ? flagSvg(color, { closed: true, gold: s.legendary })
-    : `<div style="position:relative">${flagSvg(color, { frame: 0, gold: s.legendary })}<div style="position:absolute;inset:0;animation:pp-flap 1.1s steps(1) infinite">${flagSvg(color, { frame: 1, gold: s.legendary })}</div></div>`;
+    ? flagSvg(color, { closed: true, gold: s.legendary, scale: px })
+    : `<div style="position:relative">${flagSvg(color, { frame: 0, gold: s.legendary, scale: px })}<div style="position:absolute;inset:0;animation:pp-flap 1.1s steps(1) infinite">${flagSvg(color, { frame: 1, gold: s.legendary, scale: px })}</div></div>`;
 
   // 깃대 꼭대기: 왕관(해적왕의 영지) 또는 성(영주)
   const poleX = 2.5 * px;
   const top = s.kingDomain
-    ? `<div style="position:absolute;bottom:calc(100% - 4px);left:${poleX}px;transform:translateX(-50%);filter:drop-shadow(1px 1px 0 #0b1220)">${crownSvg(2)}</div>`
+    ? `<div style="position:absolute;bottom:calc(100% - 4px);left:${poleX}px;transform:translateX(-50%);filter:drop-shadow(1px 1px 0 #0b1220)">${crownSvg(compact ? 1.3 : 2)}</div>`
     : s.lord
-      ? `<div style="position:absolute;bottom:calc(100% - 3px);left:${poleX}px;transform:translateX(-50%);filter:drop-shadow(1px 1px 0 #0b1220)">${castleSvg(1.8)}</div>`
+      ? `<div style="position:absolute;bottom:calc(100% - 3px);left:${poleX}px;transform:translateX(-50%);filter:drop-shadow(1px 1px 0 #0b1220)">${castleSvg(compact ? 1.2 : 1.8)}</div>`
       : "";
 
   // 정박 중인 배: 깃대 오른쪽 아래에 최대 3척, 뒤로 갈수록 살짝 위·오른쪽
-  const ships = s.parkedShips
+  const ships = (compact ? [] : s.parkedShips)
     .slice(0, 3)
     .map(
       (tier, i) =>
@@ -180,11 +185,11 @@ export function pinHtml(s: SpotSummary, selected: boolean): string {
   const tags = [
     s.navyAlert ? tag("#dc2626", "#fff", ico("warn"), "animation:pp-blink 1s steps(2) infinite") : "",
     s.parkedCount > 0 ? tag("#f5c451", "#0b1220", `${ico("anchor")}${s.parkedCount}`) : "",
-    s.bounty > 0 ? tag("#16a34a", "#fff", `${ico("coin")}${s.bounty}`) : "",
-    s.treasure ? `<span style="display:inline-block;animation:pp-bob-y 1.2s steps(2) infinite">${chestSvg(2)}</span>` : "",
+    s.bounty > 0 ? tag("#16a34a", "#fff", compact ? ico("coin") : `${ico("coin")}${s.bounty}`) : "",
+    s.treasure ? `<span style="display:inline-block;animation:pp-bob-y 1.2s steps(2) infinite">${chestSvg(compact ? 1.4 : 2)}</span>` : "",
   ].filter(Boolean);
   const bottom = tags.length
-    ? `<div style="position:absolute;top:calc(100% + ${s.parkedShips.length ? 8 : 2}px);left:${poleX}px;transform:translateX(-50%);display:flex;gap:2px;align-items:center">${tags.join("")}</div>`
+    ? `<div style="position:absolute;top:calc(100% + ${!compact && s.parkedShips.length ? 8 : 2}px);left:${poleX}px;transform:translateX(-50%);display:flex;gap:2px;align-items:center">${tags.join("")}</div>`
     : "";
 
   return `
@@ -193,5 +198,30 @@ export function pinHtml(s: SpotSummary, selected: boolean): string {
       <div style="opacity:${isStale(s) ? 0.55 : 1};filter:${shadow}">${flag}</div>
       ${ships}
       ${bottom}
+    </div>`;
+}
+
+/**
+ * 겹친 정박지 묶음: 깃발 두 개를 겹쳐 그리고 개수 표시.
+ * 안에 해군·보물·현상금·정박 중인 곳이 있으면 아래에 작은 아이콘으로 알려 준다.
+ * 오버레이는 xAnchor 0.5, yAnchor 1.
+ */
+export function clusterHtml(spots: SpotSummary[]): string {
+  const sorted = [...spots].sort((a, b) => (b.guardAvg ?? 0) - (a.guardAvg ?? 0));
+  const back = flagSvg(pirateColor(sorted[1]?.guardAvg ?? null, false), { scale: 2 });
+  const front = flagSvg(pirateColor(sorted[0].guardAvg, sorted[0].status === "closed"), { scale: 2 });
+  const parked = spots.reduce((n, s) => n + s.parkedCount, 0);
+  const extras = [
+    spots.some((s) => s.navyAlert) ? ico("warn") : "",
+    spots.some((s) => s.treasure) ? ico("chest") : "",
+    spots.some((s) => s.bounty > 0) ? ico("coin") : "",
+    parked > 0 ? `${ico("anchor")}${parked}` : "",
+  ].filter(Boolean);
+  return `
+    <div data-spot="cluster" style="position:relative;width:46px;height:40px;cursor:pointer;filter:drop-shadow(2px 2px 0 rgba(0,0,0,.5))">
+      <div style="position:absolute;left:12px;bottom:4px">${back}</div>
+      <div style="position:absolute;left:0;bottom:0">${front}</div>
+      <span style="position:absolute;left:38px;top:-10px;height:17px;padding:0 3px;background:#f4ead2;color:#2b1d0e;border:2px solid #0b1220;font:900 11px/13px ui-monospace,Menlo,monospace;white-space:nowrap;box-shadow:1px 1px 0 rgba(0,0,0,.6)">×${spots.length}</span>
+      ${extras.length ? `<div style="position:absolute;top:calc(100% + 2px);left:50%;transform:translateX(-50%);display:flex">${tag("#0b1a2e", "#fff", extras.join(" "))}</div>` : ""}
     </div>`;
 }
