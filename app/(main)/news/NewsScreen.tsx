@@ -9,6 +9,7 @@ import { ErrorText } from "@/components/ui";
 import { api } from "@/lib/api";
 import { getFeedSeen, setFeedSeen } from "@/lib/feedSeen";
 import { guardColor, timeAgo } from "@/lib/format";
+import PxText from "@/components/PxText";
 import type { FeedItem } from "@/lib/types";
 
 type Filter = "all" | FeedItem["kind"];
@@ -48,7 +49,7 @@ export default function NewsScreen() {
               onClick={() => setFilter(k)}
               className={`h-10 rounded-lg ${filter === k ? "bg-gold-400 text-sea-950" : "text-slate-300"}`}
             >
-              {label}
+              <PxText text={label} />
             </button>
           ))}
         </div>
@@ -71,7 +72,9 @@ function FeedCard({ item: it, isNew }: { item: FeedItem; isNew: boolean }) {
   const who = <Nickname name={it.nickname} color={it.nameColor} effect={it.nameEffect} className="font-bold" />;
   const head = (icon: string, text: React.ReactNode) => (
     <div className="flex items-start gap-2">
-      <span className="text-lg leading-6">{icon}</span>
+      <span className="text-lg leading-6">
+        <PxText text={icon} size={20} />
+      </span>
       <div className="min-w-0 flex-1 text-sm leading-6">{text}</div>
       {isNew && <span className="pixel-tag shrink-0 bg-red-500 text-white">NEW</span>}
     </div>

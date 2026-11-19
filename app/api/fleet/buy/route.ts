@@ -44,7 +44,7 @@ export const POST = handle(async (req: Request) => {
         on conflict (user_id, item_id) do update set qty = crew_items.qty + excluded.qty
       `),
     );
-    message = `${item.icon} ${item.name} ${qty}개를 실었어요`;
+    message = `${item.kind === "weapon" ? "⚔️" : "🛡"} ${item.name} ${qty}개를 실었어요`;
   } else if (kind === "npc") {
     const npc = typeof body.role === "string" ? npcOf(body.role) : undefined;
     if (!npc) bad("없는 선원이에요.");
@@ -59,7 +59,7 @@ export const POST = handle(async (req: Request) => {
       `);
       if (!res.rows.length) throw new HttpError(409, "이미 레벨이 올랐어요. 다시 시도해 주세요.");
     });
-    message = lv === 0 ? `${npc.icon} ${crew.name} ${npc.name}이(가) 승선했어요!` : `${npc.icon} ${crew.name} ${npc.name} Lv.${lv + 1}!`;
+    message = lv === 0 ? `👥 ${crew.name} ${npc.name}이(가) 승선했어요!` : `👥 ${crew.name} ${npc.name} Lv.${lv + 1}!`;
   } else if (kind === "repair") {
     const cost = repairCost(crew.hpNow, crew.stats.maxHp);
     if (cost <= 0) bad("배가 이미 멀쩡해요.");

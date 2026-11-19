@@ -8,6 +8,7 @@ import { SPOT_PHOTO_MAX } from "@/lib/game";
 import { uploadPhoto } from "@/lib/image";
 import type { SpotPhoto } from "@/lib/types";
 import { useConfirm } from "./feedback";
+import Px from "./Px";
 
 export const PHOTO_NOTICE = "차량 번호판·사람 얼굴은 피해서 찍어 주세요. 사진 속 위치 정보는 자동으로 지워져요.";
 
@@ -53,7 +54,7 @@ export function SpotPhotoStrip({
     <div className="mt-3 rounded-xl bg-sea-800 px-3 py-2.5">
       <div className="mb-2 flex items-center justify-between">
         <h3 className="text-sm font-bold text-slate-300">
-          📷 사진 <span className="font-normal text-slate-500">{photos?.length ?? 0}</span>
+          <Px name="camera" size="1.15em" /> 사진 <span className="font-normal text-slate-500">{photos?.length ?? 0}</span>
         </h3>
         <span className="text-[11px] text-slate-500">입구·진입로·방문자 칸</span>
       </div>
@@ -205,7 +206,7 @@ export function PhotoPicker({ file, onChange }: { file: File | null; onChange: (
           onClick={() => inputRef.current?.click()}
           className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-sea-600 text-sm font-bold text-slate-300"
         >
-          📷 사진 붙이기 (선택)
+          <Px name="camera" size="1.15em" /> 사진 붙이기 (선택)
         </button>
       )}
       <input

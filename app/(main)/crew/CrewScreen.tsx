@@ -1,5 +1,8 @@
 "use client";
 
+import Px from "@/components/Px";
+import PxText from "@/components/PxText";
+
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AmountSheet, useConfirm, useToast } from "@/components/feedback";
@@ -136,7 +139,7 @@ export default function CrewScreen() {
               onClick={() => setTab(k)}
               className={`h-10 rounded-lg ${tab === k ? "bg-gold-400 text-sea-950" : "text-slate-300"}`}
             >
-              {label}
+              <PxText text={label} />
             </button>
           ))}
         </div>
@@ -196,7 +199,7 @@ function ChartPanel({ spots }: { spots: SpotSummary[] }) {
         href="/?fog=1"
         className="flex min-h-12 items-center justify-center rounded-xl bg-gold-400 font-bold text-sea-950"
       >
-        🗺️ 지도에서 해도 보기
+        <Px name="map" size="1.15em" /> 지도에서 해도 보기
       </Link>
     </div>
   );
@@ -217,19 +220,21 @@ function Board({
   colors: Map<string, NameStyle>;
   highlight?: boolean;
 }) {
-  const medals = ["🥇", "🥈", "🥉"];
+  const medals = ["medal", "medal2", "medal3"] as const;
   return (
     <section className={`rounded-2xl p-4 ${highlight ? "border border-gold-400/40 bg-gold-400/10" : "bg-sea-800"}`}>
-      <h3 className="mb-2 font-bold">{title}</h3>
+      <h3 className="mb-2 font-bold">
+        <PxText text={title} />
+      </h3>
       {entries.length === 0 ? (
         <p className="text-sm text-slate-500">아직 기록이 없어요. 첫 번째가 되어 보세요!</p>
       ) : (
         <ol className="space-y-1">
           {entries.map((e, i) => (
             <li key={e.userId} className="flex items-center gap-2 text-sm">
-              <span className="w-6 text-center">{medals[i] ?? i + 1}</span>
+              <span className="flex w-6 justify-center">{medals[i] ? <Px name={medals[i]} size={18} /> : i + 1}</span>
               <span className="flex-1 font-semibold">
-                {kingIds.has(e.userId) && "👑 "}
+                {kingIds.has(e.userId) && <PxText text="👑 " />}
                 <Nickname name={e.nickname} color={colors.get(e.userId)?.color} effect={colors.get(e.userId)?.effect} />
               </span>
               <span className="text-slate-300">
@@ -261,15 +266,15 @@ function Node({ m, depth, ctx }: { m: Member; depth: number; ctx: Ctx }) {
         {depth > 0 && <span className="text-sea-600">└</span>}
         <div className="min-w-0">
           <div className={`truncate font-semibold ${banned ? "text-slate-500 line-through" : ""}`}>
-            {m.isKing && "👑 "}
-            {m.flag}{" "}
+            {m.isKing && <PxText text="👑 " />}
+            <PxText text={m.flag} />{" "}
             {banned ? m.nickname : <Nickname name={m.nickname} color={m.nameColor} effect={m.nameEffect} />}
             {m.id === me?.id && (
               <span className="ml-1.5 rounded bg-gold-400/20 px-1.5 text-[11px] text-gold-400">나</span>
             )}
           </div>
           <div className="text-[11px] text-slate-400">
-            {banned ? <span className="text-red-400">추방됨</span> : m.title} · 💰{m.doubloons}
+            {banned ? <span className="text-red-400">추방됨</span> : m.title} · <Px name="coin" size="1.15em" />{m.doubloons}
             {kids.length > 0 && ` · 데려온 선원 ${kids.length}`}
           </div>
         </div>
@@ -279,7 +284,7 @@ function Node({ m, depth, ctx }: { m: Member; depth: number; ctx: Ctx }) {
             aria-label={`${m.nickname}님에게 결투 신청`}
             className="ml-auto h-9 w-9 shrink-0 rounded-lg bg-sea-700 text-base active:bg-sea-600"
           >
-            ⚔️
+            <Px name="swords" size="1.15em" />
           </button>
         )}
         {me?.role === "admin" && !banned && m.role !== "admin" && (

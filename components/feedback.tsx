@@ -3,6 +3,8 @@
 import { useCallback, useRef, useState } from "react";
 import Sheet from "./Sheet";
 import { Button } from "./ui";
+import Px from "./Px";
+import PxText from "./PxText";
 
 /** 화면 아래쪽에 잠깐 뜨는 알림. [노드, show] 를 돌려준다 */
 export function useToast(bottomClass = "bottom-24") {
@@ -20,7 +22,7 @@ export function useToast(bottomClass = "bottom-24") {
       aria-live="polite"
     >
       <div className="max-w-sm rounded-2xl bg-black/90 px-4 py-2.5 text-center text-sm whitespace-pre-line shadow-xl">
-        {msg}
+        <PxText text={msg} />
       </div>
     </div>
   ) : null;
@@ -41,14 +43,25 @@ export function useConfirm() {
     setState(null);
   };
   const node = state ? (
-    <Sheet onClose={() => close(false)} title={<h2 className="text-lg font-black">{state.title}</h2>}>
-      {state.message && <p className="mb-4 text-sm whitespace-pre-line text-slate-300">{state.message}</p>}
+    <Sheet
+      onClose={() => close(false)}
+      title={
+        <h2 className="text-lg font-black">
+          <PxText text={state.title} />
+        </h2>
+      }
+    >
+      {state.message && (
+        <p className="mb-4 text-sm whitespace-pre-line text-slate-300">
+          <PxText text={state.message} />
+        </p>
+      )}
       <div className="grid grid-cols-2 gap-2">
         <Button variant="ghost" onClick={() => close(false)}>
           취소
         </Button>
         <Button variant={state.danger ? "danger" : "primary"} onClick={() => close(true)}>
-          {state.confirmLabel ?? "확인"}
+          <PxText text={state.confirmLabel ?? "확인"} />
         </Button>
       </div>
     </Sheet>
@@ -79,8 +92,17 @@ export function AmountSheet({
   const [error, setError] = useState("");
   const lacking = balance != null && amount > balance;
   return (
-    <Sheet onClose={onClose} title={<h2 className="text-lg font-black">{title}</h2>}>
-      <p className="mb-3 text-sm text-slate-300">{description}</p>
+    <Sheet
+      onClose={onClose}
+      title={
+        <h2 className="text-lg font-black">
+          <PxText text={title} />
+        </h2>
+      }
+    >
+      <p className="mb-3 text-sm text-slate-300">
+        <PxText text={description} />
+      </p>
       <div className="grid grid-cols-4 gap-2">
         {options.map((n) => (
           <button
@@ -96,7 +118,7 @@ export function AmountSheet({
       </div>
       {balance != null && (
         <p className={`mt-2 text-xs ${lacking ? "text-red-400" : "text-slate-400"}`}>
-          보유 💰 {balance} {lacking && "· 두블룬이 모자라요"}
+          보유 <Px name="coin" size="1.15em" /> {balance} {lacking && "· 두블룬이 모자라요"}
         </p>
       )}
       {error && <p className="mt-2 rounded-lg bg-red-950/60 px-3 py-2 text-sm text-red-300">{error}</p>}
@@ -114,7 +136,7 @@ export function AmountSheet({
           }
         }}
       >
-        {busy ? "처리 중…" : `${confirmLabel} (💰${amount})`}
+        {busy ? "처리 중…" : <PxText text={`${confirmLabel} (💰${amount})`} />}
       </Button>
     </Sheet>
   );

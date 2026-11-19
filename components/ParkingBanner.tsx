@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { duration, timeAgo } from "@/lib/format";
 import type { ActiveParking } from "@/lib/types";
+import Px from "./Px";
 
 export default function ParkingBanner({
   parking,
@@ -27,7 +28,7 @@ export default function ParkingBanner({
     <div className={`rounded-2xl shadow-lg ${alert ? "bg-red-600 text-white" : "bg-gold-400 text-sea-950"}`}>
       <div className="flex items-center gap-2 py-2 pr-2 pl-4">
         <button onClick={onTap} className="min-w-0 flex-1 text-left">
-          <div className="truncate text-sm font-black">⚓ {parking.spotName} 정박 중</div>
+          <div className="truncate text-sm font-black"><Px name="anchor" size="1.15em" /> {parking.spotName} 정박 중</div>
           <div className="text-xs font-semibold opacity-80">{duration(parking.startedAt)} 경과</div>
         </button>
         <button
@@ -40,7 +41,7 @@ export default function ParkingBanner({
       </div>
       {alert && (
         <div className="border-t border-white/30 px-4 py-1.5 text-xs font-bold">
-          ⚠ 해군 출몰! {alert.by}님 제보 · {timeAgo(alert.at)}
+          <Px name="warn" size="1.15em" /> 해군 출몰! {alert.by}님 제보 · {timeAgo(alert.at)}
         </div>
       )}
     </div>

@@ -1,4 +1,5 @@
 import type { ButtonHTMLAttributes, InputHTMLAttributes } from "react";
+import Px from "./Px";
 
 export function Button({
   variant = "primary",
@@ -39,7 +40,7 @@ export function AuthShell({ title, children }: { title: string; children: React.
   return (
     <main className="safe-top mx-auto flex min-h-dvh max-w-sm flex-col justify-center px-6 py-10">
       <div className="mb-8 text-center">
-        <div className="text-5xl">☠</div>
+        <div className="text-5xl"><Px name="skull" size="1.15em" /></div>
         <h1 className="mt-2 text-2xl font-black tracking-tight">주차해적단</h1>
         <p className="mt-1 text-sm text-slate-400">{title}</p>
       </div>

@@ -5,7 +5,8 @@ import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "reac
 import { loadKakao, type Kakao, type LatLng } from "@/lib/kakao";
 import type { RadioMessage, SpotSummary, Wonder } from "@/lib/types";
 import { pinHtml } from "@/lib/pinHtml";
-import { compassSvg, wonderSvg } from "@/lib/pixelSprites";
+import { PX_ICONS, PX_PALETTE } from "@/lib/pixelIcons";
+import { compassSvg, spriteSvg, wonderSvg } from "@/lib/pixelSprites";
 import { YEOUIDO_CELLS } from "@/lib/yeouido";
 
 export type KakaoMapHandle = {
@@ -41,7 +42,9 @@ function radioEl(m: RadioMessage): HTMLElement {
   const who = document.createElement("div");
   who.style.cssText = "font-size:10px;color:#64748b;font-weight:700";
   const mins = Math.max(0, Math.floor((Date.now() - new Date(m.createdAt).getTime()) / 60000));
-  who.textContent = `📻 ${m.nickname} · ${mins < 1 ? "방금" : `${mins}분 전`}`;
+  // 닉네임은 textContent로 (HTML 주입 방지), 아이콘은 우리가 만든 도트 SVG
+  who.innerHTML = spriteSvg(PX_ICONS.radio, PX_PALETTE, 1.1, "display:inline-block;vertical-align:-2px;margin-right:3px");
+  who.append(`${m.nickname} · ${mins < 1 ? "방금" : `${mins}분 전`}`);
   const body = document.createElement("div");
   body.style.cssText = "word-break:break-all";
   body.textContent = m.text;

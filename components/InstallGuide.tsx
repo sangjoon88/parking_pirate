@@ -1,5 +1,6 @@
 "use client";
 
+import Px from "./Px";
 import { useSyncExternalStore } from "react";
 
 type Platform = "ios" | "android" | "other" | "installed";
@@ -24,7 +25,7 @@ export default function InstallGuide() {
 
   return (
     <section className="rounded-2xl border border-gold-400/30 bg-gold-400/5 p-4 text-sm">
-      <h2 className="mb-2 font-bold text-gold-400">📲 홈 화면에 추가하기</h2>
+      <h2 className="mb-2 font-bold text-gold-400"><Px name="phone" size="1.15em" /> 홈 화면에 추가하기</h2>
       {platform === "ios" ? (
         <ol className="list-decimal space-y-1 pl-5 text-slate-300">
           <li>

@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 import { dateTime } from "@/lib/format";
 import { DUEL_DAYS } from "@/lib/game";
 import { useConfirm } from "./feedback";
+import Px from "./Px";
 
 type Duel = {
   id: string;
@@ -72,7 +73,7 @@ export default function DuelPanel({ onChanged }: { onChanged: (msg: string) => v
     <div className="space-y-2">
       {confirmNode}
       <p className="text-xs text-slate-400">
-        선원 명부에서 상대 옆 ⚔️를 눌러 신청해요. {DUEL_DAYS}일 동안 정박을 더 많이 한 쪽이 판돈 2배를 가져가고, 비기면
+        선원 명부에서 상대 옆 <Px name="swords" size="1.15em" />를 눌러 신청해요. {DUEL_DAYS}일 동안 정박을 더 많이 한 쪽이 판돈 2배를 가져가고, 비기면
         돌려받아요. 신청 후 2일 안에 응답이 없으면 환불돼요.
       </p>
       {duels.length === 0 && <p className="py-4 text-center text-sm text-slate-500">아직 결투 기록이 없어요.</p>}
@@ -87,7 +88,7 @@ export default function DuelPanel({ onChanged }: { onChanged: (msg: string) => v
         return (
           <div key={d.id} className="rounded-xl bg-sea-800 p-3">
             <div className="flex items-center justify-between">
-              <div className="font-bold">⚔️ vs {other}</div>
+              <div className="font-bold"><Px name="swords" size="1.15em" /> vs {other}</div>
               <span
                 className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
                   d.status === "active"
@@ -103,7 +104,7 @@ export default function DuelPanel({ onChanged }: { onChanged: (msg: string) => v
               </span>
             </div>
             <div className="mt-1 text-xs text-slate-400">
-              판돈 💰{d.stake} · {meChallenger ? "내가 신청" : "받은 신청"}
+              판돈 <Px name="coin" size="1.15em" />{d.stake} · {meChallenger ? "내가 신청" : "받은 신청"}
               {d.status === "active" && d.endsAt && ` · ${dateTime(d.endsAt)}까지`}
             </div>
             {(d.status === "active" || d.status === "done") && (
@@ -124,7 +125,7 @@ export default function DuelPanel({ onChanged }: { onChanged: (msg: string) => v
                   onClick={() => respond(d, "accept")}
                   className="h-10 rounded-lg bg-gold-400 text-sm font-bold text-sea-950"
                 >
-                  수락 (💰{d.stake})
+                  수락 (<Px name="coin" size="1.15em" />{d.stake})
                 </button>
               </div>
             )}

@@ -1,7 +1,7 @@
 import { spriteSvg } from "./pixelSprites";
 
 /** 배 단계별 도트 그림 (20x12, 오른쪽을 바라봄) */
-const SHIP_ROWS: string[][] = [
+export const SHIP_ROWS: string[][] = [
   // 0 돛단배
   [
     "........M...........",
@@ -94,7 +94,7 @@ const SHIP_ROWS: string[][] = [
   ],
 ];
 
-const PALETTE = {
+export const SHIP_PALETTE: Record<string, string> = {
   X: "#2b1d0e",
   H: "#8a5a2b",
   h: "#5e3b1a",
@@ -115,5 +115,5 @@ const PALETTE = {
 
 export function shipSvg(tier: number, scale: number, flip = false): string {
   const rows = SHIP_ROWS[Math.max(0, Math.min(SHIP_ROWS.length - 1, tier))];
-  return spriteSvg(rows, PALETTE, scale, `${flip ? "transform:scaleX(-1);" : ""}${tier === 5 ? "opacity:.85;" : ""}`);
+  return spriteSvg(rows, SHIP_PALETTE, scale, `${flip ? "transform:scaleX(-1);" : ""}${tier === 5 ? "opacity:.85;" : ""}`);
 }

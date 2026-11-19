@@ -1,5 +1,6 @@
 "use client";
 
+import Px from "./Px";
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { NOTE_MAX } from "@/lib/constants";
@@ -91,7 +92,7 @@ export default function ReportSheet({
         </p>
       )}
       {!editing && weather === "storm" && (
-        <p className="mb-3 rounded-xl bg-sea-700 px-3 py-2 text-xs font-bold">🌪 폭풍 주간: 이번 주 일지 금화 2배!</p>
+        <p className="mb-3 rounded-xl bg-sea-700 px-3 py-2 text-xs font-bold"><Px name="storm" size="1.15em" /> 폭풍 주간: 이번 주 일지 금화 2배!</p>
       )}
       <section>
         <h3 className="mb-2 text-sm font-bold text-slate-300">경계 레벨</h3>
@@ -115,7 +116,7 @@ export default function ReportSheet({
           })}
         </div>
         {!editing && guardLevel === 5 && (
-          <p className="mt-2 text-xs font-bold text-red-400">⚠ 이 정박지에 정박 중인 선원들에게 해군 출몰 경보가 30분간 뜹니다</p>
+          <p className="mt-2 text-xs font-bold text-red-400"><Px name="warn" size="1.15em" /> 이 정박지에 정박 중인 선원들에게 해군 출몰 경보가 30분간 뜹니다</p>
         )}
       </section>
 
@@ -123,19 +124,19 @@ export default function ReportSheet({
         <h3 className="mb-2 text-sm font-bold text-slate-300">차단기 상태</h3>
         <div className="grid grid-cols-2 gap-2">
           <Toggle on={gateStatus === "no_gate"} onClick={() => setGateStatus(gateStatus === "no_gate" ? null : "no_gate")}>
-            ✅ 그대로 없음
+            <Px name="check" size="1.15em" /> 그대로 없음
           </Toggle>
           <Toggle
             on={gateStatus === "gate_installed"}
             danger
             onClick={() => setGateStatus(gateStatus === "gate_installed" ? null : "gate_installed")}
           >
-            🚧 생겼음
+            <Px name="gate" size="1.15em" /> 생겼음
           </Toggle>
         </div>
         {!editing && spot.bounty > 0 && (
           <p className="mt-2 text-xs text-green-400">
-            💰 &ldquo;그대로 없음&rdquo;으로 확인하면 현상금 {spot.bounty}두블룬을 받아요
+            <Px name="coin" size="1.15em" /> &ldquo;그대로 없음&rdquo;으로 확인하면 현상금 {spot.bounty}두블룬을 받아요
           </p>
         )}
       </section>

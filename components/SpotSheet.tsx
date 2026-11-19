@@ -1,5 +1,7 @@
 "use client";
 
+import Px from "./Px";
+import PxText from "./PxText";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { GUARD_LABELS, guardColor, timeAgo } from "@/lib/format";
@@ -186,7 +188,7 @@ export default function SpotSheet({
         <>
           {spot.legendary && (
             <p className="text-xs font-bold text-gold-400">
-              ✨ 전설의 정박지{spot.nickname ? ` · “${spot.nickname}”` : ""}
+              <Px name="sparkle" size="1.15em" /> 전설의 정박지{spot.nickname ? ` · “${spot.nickname}”` : ""}
             </p>
           )}
           <h2 className="truncate text-xl font-black">{spot.name}</h2>
@@ -199,15 +201,15 @@ export default function SpotSheet({
           <div className={`grid grid-cols-2 gap-2 ${error ? "mt-2" : ""}`}>
             {parkedHere ? (
               <div className="flex min-h-12 items-center justify-center rounded-xl bg-sea-700 font-bold text-gold-400">
-                ⚓ 정박 중
+                <Px name="anchor" size="1.15em" /> 정박 중
               </div>
             ) : (
               <Button onClick={start} disabled={busy || closed || !!parking}>
-                {busy ? "정박 중…" : parking ? "다른 곳 정박 중" : closed ? "닫힌 정박지" : "⚓ 정박 시작"}
+                {busy ? "정박 중…" : parking ? "다른 곳 정박 중" : closed ? "닫힌 정박지" : <PxText text="⚓ 정박 시작" />}
               </Button>
             )}
             <Button variant="ghost" onClick={() => onWriteReport(spot)}>
-              📜 일지 쓰기
+              <Px name="scroll" size="1.15em" /> 일지 쓰기
             </Button>
           </div>
         </>
@@ -215,31 +217,31 @@ export default function SpotSheet({
     >
       {/* 알림 카드들: 중요한 순서 */}
       <div className="space-y-2">
-        {closed && <Notice tone="gray">🚧 차단기가 생겼다는 제보가 있어 닫힌 정박지예요.</Notice>}
+        {closed && <Notice tone="gray"><Px name="gate" size="1.15em" /> 차단기가 생겼다는 제보가 있어 닫힌 정박지예요.</Notice>}
         {spot.navyAlert && (
           <Notice tone="red">
-            ⚠ <b>해군 출몰!</b> {spot.navyAlert.by}님이 경계 5를 제보 · {timeAgo(spot.navyAlert.at)}
+            <Px name="warn" size="1.15em" /> <b>해군 출몰!</b> {spot.navyAlert.by}님이 경계 5를 제보 · {timeAgo(spot.navyAlert.at)}
           </Notice>
         )}
         {spot.kingDomain && (
           <Notice tone="gold">
-            👑 <b>해적왕의 영지</b> · 지난달 해적왕 {spot.kingDomain.nickname}님이 다스리는 곳
+            <Px name="crown" size="1.15em" /> <b>해적왕의 영지</b> · 지난달 해적왕 {spot.kingDomain.nickname}님이 다스리는 곳
           </Notice>
         )}
         {spot.treasure > 0 && (
           <Notice tone="gold">
-            📦 <b>오늘의 보물상자</b>가 여기 있어요! 오늘 처음 정박하는 선원이 가져가요.
+            <Px name="chest" size="1.15em" /> <b>오늘의 보물상자</b>가 여기 있어요! 오늘 처음 정박하는 선원이 가져가요.
           </Notice>
         )}
         {spot.bounty > 0 && (
           <Notice tone="green">
-            💰 <b>현상금 {spot.bounty}두블룬</b>
+            <Px name="coin" size="1.15em" /> <b>현상금 {spot.bounty}두블룬</b>
             {spot.postedBounty > 0 && <span className="text-slate-300"> (선원이 건 {spot.postedBounty} 포함)</span>}
             <span className="text-slate-300"> · &ldquo;차단기 그대로 없음&rdquo; 일지를 쓰면 획득</span>
           </Notice>
         )}
-        {spot.parkedCount >= FLEET_SIZE && <Notice tone="sea">⛵ 함대 집결 중! 지금 정박하면 보너스</Notice>}
-        {spot.stashRumor && <Notice tone="sea">🪙 소문: 누군가 이곳에 보물을 묻어 뒀대요…</Notice>}
+        {spot.parkedCount >= FLEET_SIZE && <Notice tone="sea"><Px name="ship" size="1.15em" /> 함대 집결 중! 지금 정박하면 보너스</Notice>}
+        {spot.stashRumor && <Notice tone="sea"><Px name="coin" size="1.15em" /> 소문: 누군가 이곳에 보물을 묻어 뒀대요…</Notice>}
       </div>
 
       <div className="mt-3 grid grid-cols-3 gap-2 text-center">
@@ -259,7 +261,7 @@ export default function SpotSheet({
       {/* 정박지 소개: 누구나 고칠 수 있음 */}
       <div className="mt-3 rounded-xl bg-sea-800 px-3 py-2.5">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-bold text-slate-300">📝 정박지 소개</h3>
+          <h3 className="text-sm font-bold text-slate-300"><Px name="note" size="1.15em" /> 정박지 소개</h3>
           <button onClick={() => setSub("description")} className="-mr-1 h-8 px-2 text-xs font-bold text-gold-400">
             {spot.description ? "고치기" : "쓰기"}
           </button>
@@ -281,7 +283,7 @@ export default function SpotSheet({
       {/* 경비원 메모: 누구나 추가, 적은 사람·관리자만 삭제 */}
       <div className="mt-3 rounded-xl bg-sea-800 px-3 py-2.5">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-bold text-slate-300">👮 경비원 번호</h3>
+          <h3 className="text-sm font-bold text-slate-300"><Px name="guard" size="1.15em" /> 경비원 번호</h3>
           <button onClick={() => setSub("guard")} className="-mr-1 h-8 px-2 text-xs font-bold text-gold-400">
             + 추가
           </button>
@@ -323,12 +325,12 @@ export default function SpotSheet({
       {/* 영주 · 발견자 */}
       <div className="mt-3 divide-y divide-sea-700 rounded-xl bg-sea-800 text-sm">
         <div className="flex items-center justify-between px-3 py-2">
-          <span className="text-slate-400">🏰 영주</span>
+          <span className="text-slate-400"><Px name="castle" size="1.15em" /> 영주</span>
           <span className="font-semibold">
             {spot.lord ? (
               <>
-                {spot.kingDomain && "👑 "}
-                {spot.lord.flag} {spot.lord.nickname}
+                {spot.kingDomain && <PxText text="👑 " />}
+                <PxText text={spot.lord.flag} /> {spot.lord.nickname}
                 <span className="ml-1 text-xs font-normal text-slate-400">30일 {spot.lord.count}회</span>
               </>
             ) : (
@@ -337,14 +339,14 @@ export default function SpotSheet({
           </span>
         </div>
         <div className="flex items-center justify-between px-3 py-2">
-          <span className="text-slate-400">☠ 발견</span>
+          <span className="text-slate-400"><Px name="skull" size="1.15em" /> 발견</span>
           <span className="font-semibold">
             {spot.discoverer}
             <span className="ml-1 text-xs font-normal text-slate-400">{timeAgo(spot.createdAt)}</span>
           </span>
         </div>
         <div className="flex items-center justify-between px-3 py-2">
-          <span className="text-slate-400">⚓ 누적 정박</span>
+          <span className="text-slate-400"><Px name="anchor" size="1.15em" /> 누적 정박</span>
           <span className="font-semibold">
             {spot.totalParkings}회
             {!spot.legendary && (
@@ -358,10 +360,10 @@ export default function SpotSheet({
       {!closed && (
         <div className="mt-3 grid grid-cols-2 gap-2">
           <button onClick={() => setSub("bounty")} className="min-h-11 rounded-xl border border-sea-600 text-sm font-bold">
-            💰 현상금 걸기
+            <Px name="coin" size="1.15em" /> 현상금 걸기
           </button>
           <button onClick={() => setSub("stash")} className="min-h-11 rounded-xl border border-sea-600 text-sm font-bold">
-            🪙 보물 묻기
+            <Px name="coin" size="1.15em" /> 보물 묻기
           </button>
         </div>
       )}
@@ -370,7 +372,7 @@ export default function SpotSheet({
           onClick={() => setSub("nickname")}
           className="mt-2 min-h-11 w-full rounded-xl border border-gold-400/60 text-sm font-bold text-gold-400"
         >
-          ✨ 영주의 권한: 별명 짓기
+          <Px name="sparkle" size="1.15em" /> 영주의 권한: 별명 짓기
         </button>
       )}
 
@@ -472,7 +474,7 @@ function NicknameSheet({ spot, onClose, onDone }: { spot: SpotSummary; onClose: 
   return (
     <Sheet
       onClose={onClose}
-      title={<h2 className="text-lg font-black">✨ 전설의 정박지 별명</h2>}
+      title={<h2 className="text-lg font-black"><Px name="sparkle" size="1.15em" /> 전설의 정박지 별명</h2>}
       footer={
         <Button
           className="w-full"
@@ -516,7 +518,7 @@ function DescriptionSheet({ spot, onClose, onDone }: { spot: SpotSummary; onClos
       onClose={onClose}
       title={
         <>
-          <p className="text-xs text-slate-400">📝 정박지 소개</p>
+          <p className="text-xs text-slate-400"><Px name="note" size="1.15em" /> 정박지 소개</p>
           <h2 className="truncate text-lg font-black">{spot.name}</h2>
         </>
       }
@@ -568,7 +570,7 @@ function GuardSheet({ spot, onClose, onDone }: { spot: SpotSummary; onClose: () 
       onClose={onClose}
       title={
         <>
-          <p className="text-xs text-slate-400">👮 경비원 번호</p>
+          <p className="text-xs text-slate-400"><Px name="guard" size="1.15em" /> 경비원 번호</p>
           <h2 className="truncate text-lg font-black">{spot.name}</h2>
         </>
       }

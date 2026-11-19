@@ -1,5 +1,8 @@
 "use client";
 
+import Px from "./Px";
+import PxText from "./PxText";
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { guardColor, timeAgo } from "@/lib/format";
@@ -261,7 +264,7 @@ export default function MapScreen({
           style={{ top: "calc(env(safe-area-inset-top) + 12px)" }}
           className="pointer-events-auto absolute right-3 z-20 flex h-9 items-center gap-1 border-2 border-[#2b1d0e] bg-[#f4ead2] px-2.5 text-xs font-black text-[#2b1d0e] shadow-[3px_3px_0_rgba(0,0,0,.45)]"
         >
-          📖 범례
+          <Px name="book" size="1.15em" /> 범례
         </button>
       )}
 
@@ -272,7 +275,7 @@ export default function MapScreen({
             onClick={() => showToast(`${w.icon} 이번 주 날씨: ${w.name}\n${w.desc}`)}
             className="pointer-events-auto flex h-9 items-center gap-1.5 rounded-full bg-sea-900/90 px-3 text-xs font-bold shadow-lg"
           >
-            <span className="text-base">{w.icon}</span>
+            <PxText text={w.icon} size={18} />
             {w.name}
             {weather !== "calm" && <span className="text-gold-400">· {w.desc}</span>}
           </button>
@@ -293,7 +296,7 @@ export default function MapScreen({
         {fog && !placing && (
           <div className="pointer-events-auto rounded-2xl bg-sea-900/95 px-4 py-2 shadow-lg">
             <div className="flex items-center justify-between text-sm font-bold">
-              <span>🗺️ 여의도 해도</span>
+              <span><Px name="map" size="1.15em" /> 여의도 해도</span>
               <span className="text-gold-400">
                 {explored.size}/{YEOUIDO_CELLS.length} 해역 · {fogPercent}%
               </span>
@@ -305,16 +308,16 @@ export default function MapScreen({
         )}
         {placing && (
           <div className="rounded-2xl bg-sea-900/95 px-4 py-3 text-center text-sm font-semibold shadow-lg">
-            {PURPOSE_HINT[mode.purpose]}
+            <PxText text={PURPOSE_HINT[mode.purpose]} />
           </div>
         )}
         {hint && !placing && (
           <div className="pointer-events-auto rounded-2xl border border-gold-400/40 bg-sea-900/95 p-3 text-sm shadow-lg">
-            <div className="mb-1 font-bold text-gold-400">☠ 주차해적단 사용법</div>
+            <div className="mb-1 font-bold text-gold-400"><Px name="skull" size="1.15em" /> 주차해적단 사용법</div>
             <ul className="space-y-0.5 text-slate-300">
               <li>· 핀을 누르면 정박지 정보와 [정박 시작]</li>
               <li>· 아래 [새 정박지] [궁금한 곳] [무전]으로 지도에 찍기 (길게 눌러도 돼요)</li>
-              <li>· 📦 보물상자, 💰 현상금, ❓ 궁금한 곳을 노려 보세요</li>
+              <li>· <Px name="chest" size="1.15em" /> 보물상자, <Px name="coin" size="1.15em" /> 현상금, <Px name="question" size="1.15em" /> 궁금한 곳을 노려 보세요</li>
             </ul>
             <button onClick={dismissHint} className="mt-2 h-9 w-full rounded-lg bg-sea-700 text-xs font-bold">
               알겠어요
@@ -326,7 +329,7 @@ export default function MapScreen({
       {/* 위치 선택 모드: 가운데 고정 핀 */}
       {placing && (
         <div className="pointer-events-none absolute top-1/2 left-1/2 z-10 -translate-x-1/2 -translate-y-full text-5xl drop-shadow-lg">
-          📍
+          <Px name="pin" size="1.15em" />
         </div>
       )}
 
@@ -349,16 +352,16 @@ export default function MapScreen({
           </div>
         ) : (
           <div className="grid grid-cols-5 gap-1 rounded-2xl bg-sea-900/95 p-1.5 shadow-xl backdrop-blur">
-            <ToolButton icon="🗺️" label="해도" active={fog} onClick={() => setFog((f) => !f)} />
-            <ToolButton icon="📻" label="무전" onClick={() => startPlacing("radio")} />
-            <ToolButton icon="❓" label="궁금한 곳" onClick={() => startPlacing("wonder")} />
+            <ToolButton icon={<Px name="map" size={26} />} label="해도" active={fog} onClick={() => setFog((f) => !f)} />
+            <ToolButton icon={<Px name="radio" size={26} />} label="무전" onClick={() => startPlacing("radio")} />
+            <ToolButton icon={<Px name="question" size={26} />} label="궁금한 곳" onClick={() => startPlacing("wonder")} />
             <ToolButton
               icon={locating ? "…" : <LocateIcon />}
               label="내 위치"
               disabled={locating}
               onClick={() => void locateMe()}
             />
-            <ToolButton icon="☠" label="새 정박지" primary onClick={() => startPlacing("spot")} />
+            <ToolButton icon={<Px name="skull" size={26} />} label="새 정박지" primary onClick={() => startPlacing("spot")} />
           </div>
         )}
       </div>
@@ -547,10 +550,16 @@ function LocateIcon() {
 function MenuItem({ icon, title, desc, onClick }: { icon: string; title: string; desc: string; onClick: () => void }) {
   return (
     <button onClick={onClick} className="flex w-full items-center gap-3 rounded-2xl bg-sea-800 px-4 py-3 text-left active:bg-sea-700">
-      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-sea-900 text-2xl">{icon}</span>
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-sea-900 text-2xl">
+        <PxText text={icon} size={28} />
+      </span>
       <span className="min-w-0">
-        <span className="block font-bold">{title}</span>
-        <span className="block text-xs text-slate-400">{desc}</span>
+        <span className="block font-bold">
+          <PxText text={title} />
+        </span>
+        <span className="block text-xs text-slate-400">
+          <PxText text={desc} />
+        </span>
       </span>
     </button>
   );
@@ -575,15 +584,15 @@ function WonderComposeSheet({ position, onClose, onSent }: { position: LatLng; o
   return (
     <Sheet
       onClose={onClose}
-      title={<h2 className="text-lg font-black">❓ 궁금한 곳 찍기</h2>}
+      title={<h2 className="text-lg font-black"><Px name="question" size="1.15em" /> 궁금한 곳 찍기</h2>}
       footer={
         <Button onClick={send} disabled={busy} className="w-full">
-          {busy ? "찍는 중…" : "❓ 찍기"}
+          {busy ? "찍는 중…" : <PxText text="❓ 찍기" />}
         </Button>
       }
     >
       <p className="mb-2 text-xs text-slate-400">
-        선원 모두에게 보여요. 누군가 근처(100m)에 정박지를 등록하면 자동으로 풀리고, 찍은 사람은 +{REWARD.wonder}💰를 받아요.
+        선원 모두에게 보여요. 누군가 근처(100m)에 정박지를 등록하면 자동으로 풀리고, 찍은 사람은 +{REWARD.wonder}<Px name="coin" size="1.15em" />를 받아요.
       </p>
       <div className="mb-2 flex flex-wrap gap-1.5">
         {quick.map((q) => (
@@ -624,13 +633,13 @@ function WonderSheet({
       onClose={onClose}
       title={
         <>
-          <p className="text-xs font-bold text-violet-300">❓ 궁금한 곳</p>
+          <p className="text-xs font-bold text-violet-300"><Px name="question" size="1.15em" /> 궁금한 곳</p>
           <h2 className="text-lg font-black break-words">{wonder.note || "여기 어때요?"}</h2>
         </>
       }
       footer={
         <div className={`grid gap-2 ${canDelete ? "grid-cols-[1fr_auto]" : ""}`}>
-          <Button onClick={onRegister}>☠ 확인했어요, 정박지로 등록</Button>
+          <Button onClick={onRegister}><Px name="skull" size="1.15em" /> 확인했어요, 정박지로 등록</Button>
           {canDelete && (
             <Button variant="ghost" onClick={onDelete} className="px-5">
               지우기
@@ -643,7 +652,7 @@ function WonderSheet({
         {wonder.mine ? "내가" : `${wonder.nickname}님이`} {timeAgo(wonder.createdAt)}에 찍었어요.
       </p>
       <p className="mt-2 pb-1 text-xs text-slate-400">
-        가 보고 차단기가 없으면 정박지로 등록해 주세요. 발견 금화를 받고, 찍은 선원도 +{REWARD.wonder}💰를 받아요.
+        가 보고 차단기가 없으면 정박지로 등록해 주세요. 발견 금화를 받고, 찍은 선원도 +{REWARD.wonder}<Px name="coin" size="1.15em" />를 받아요.
       </p>
     </Sheet>
   );
@@ -670,7 +679,7 @@ function RadioSheet({ position, onClose, onSent }: { position: LatLng; onClose: 
   return (
     <Sheet
       onClose={onClose}
-      title={<h2 className="text-lg font-black">📻 무전 남기기</h2>}
+      title={<h2 className="text-lg font-black"><Px name="radio" size="1.15em" /> 무전 남기기</h2>}
       footer={
         <Button onClick={send} disabled={busy || !text.trim()} className="w-full">
           {busy ? "보내는 중…" : "무전 보내기"}
@@ -717,16 +726,16 @@ function LegendSheet({ onClose }: { onClose: () => void }) {
     [svg(pinSvg({ color: guardColor(null, true), outline: "#0b1220", glyph: "gate", scale: 2 })), "닫힌 정박지", "차단기가 생겼다는 제보가 2건 이상"],
     [svg(pinSvg({ color: guardColor(1, false), outline: "#0b1220", glyph: "ship", scale: 2 })), "함대 집결", `${FLEET_SIZE}명 이상 정박 중. 지금 가면 보너스`],
     [svg(pinSvg({ color: guardColor(2, false), outline: "#f5c451", glyph: "skull", scale: 2 })), "전설의 정박지", "누적 정박 100회 이상, 금테"],
-    [<span key="a" className={`${tagCls} bg-gold-400 text-sea-950`}>⚓2</span>, "핀 아래 태그: 정박 인원", "지금 정박 중인 선원 수"],
+    [<span key="a" className={`${tagCls} bg-gold-400 text-sea-950`}><Px name="anchor" size="1.15em" />2</span>, "핀 아래 태그: 정박 인원", "지금 정박 중인 선원 수"],
     [svg(pennantSvg(3)), "핀 위 빨간 깃발: 영주", "최근 30일 이곳에 가장 많이 정박한 선원이 있어요. 누군지는 핀을 눌러 확인"],
     [svg(crownSvg(3)), "핀 위 왕관: 해적왕의 영지", "지난달 해적왕이 영주인 곳 (이번 달 내내)"],
-    [<span key="d" className={`${tagCls} bg-green-600 text-white`}>💰35</span>, "현상금", "'차단기 그대로 없음' 일지를 쓰면 획득"],
-    [<span key="e" className={`${tagCls} bg-red-600 text-white`}>⚠</span>, "해군 출몰", "30분 안에 경계 5 제보"],
+    [<span key="d" className={`${tagCls} bg-green-600 text-white`}><Px name="coin" size="1.15em" />35</span>, "현상금", "'차단기 그대로 없음' 일지를 쓰면 획득"],
+    [<span key="e" className={`${tagCls} bg-red-600 text-white`}><Px name="warn" size="1.15em" /></span>, "해군 출몰", "30분 안에 경계 5 제보"],
     [svg(chestSvg(3)), "오늘의 보물상자", "오늘 처음 정박하는 선원이 획득"],
     [svg(wonderSvg(2, false)), "궁금한 곳", "누가 확인해 주길 기다리는 곳"],
   ];
   return (
-    <Sheet onClose={onClose} title={<h2 className="text-lg font-black">📖 해도 범례</h2>}>
+    <Sheet onClose={onClose} title={<h2 className="text-lg font-black"><Px name="book" size="1.15em" /> 해도 범례</h2>}>
       <ul className="space-y-2.5 pb-2">
         {rows.map(([icon, name, desc]) => (
           <li key={name} className="flex items-center gap-3">

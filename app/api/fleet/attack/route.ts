@@ -7,7 +7,7 @@ import { bad, handle, HttpError, readJson, requireUser } from "@/lib/auth";
 import { award } from "@/lib/doubloons";
 import { fleetState } from "@/lib/fleetState";
 import type { BattleLog } from "@/lib/fleetTypes";
-import { NAVAL, raidTerms, simulate, type CrewStats } from "@/lib/naval";
+import { itemOf, NAVAL, raidTerms, simulate, type CrewStats } from "@/lib/naval";
 import { canAttack, loadCrews, raidsToday, recentTargets, type CrewFull } from "@/lib/navalServer";
 
 const UUID = /^[0-9a-f-]{36}$/i;
@@ -22,6 +22,12 @@ function rollBreaks(stats: CrewStats, won: boolean) {
     if (n) out.push({ id: e.id, count: n });
   }
   return out;
+}
+
+/** 장착 장비 중 가장 강한 무기·방어구 (장착 목록은 강한 순) */
+function gearOf(stats: CrewStats) {
+  const find = (kind: "weapon" | "armor") => stats.equipped.find((e) => itemOf(e.id)?.kind === kind)?.id ?? null;
+  return { weapon: find("weapon"), armor: find("armor") };
 }
 
 const side = (c: CrewFull) => ({
@@ -93,6 +99,7 @@ export const POST = handle(async (req: Request) => {
       refund,
       brokenA,
       brokenD,
+      gear: { a: gearOf(me.stats), d: gearOf(foe.stats) },
     };
     await tx.insert(battles).values({
       id: battleId,

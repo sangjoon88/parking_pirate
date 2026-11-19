@@ -9,6 +9,7 @@
 import { STALE_DAYS } from "./constants";
 import { guardColor } from "./format";
 import { FLEET_SIZE } from "./game";
+import { PX_ICONS, PX_PALETTE } from "./pixelIcons";
 import { chestSvg, pinSvg, spriteSvg } from "./pixelSprites";
 import type { SpotSummary } from "./types";
 
@@ -30,6 +31,11 @@ export function crownSvg(scale: number) {
     { Y: "#f5c451", R: "#dc2626", B: "#3b82f6", o: "#b8860b" },
     scale,
   );
+}
+
+/** 태그 안 작은 도트 아이콘 (10x10 → 11px) */
+function ico(name: keyof typeof PX_ICONS) {
+  return spriteSvg(PX_ICONS[name], PX_PALETTE, 1.1, "display:inline-block;vertical-align:-2px;margin-right:1px");
 }
 
 function tag(bg: string, fg: string, text: string, extra = "") {
@@ -63,9 +69,9 @@ export function pinHtml(s: SpotSummary, selected: boolean): string {
 
   // 핀 아래: 상태 태그 한 줄
   const tags = [
-    s.navyAlert ? tag("#dc2626", "#fff", "⚠", "animation:pp-blink 1s steps(2) infinite") : "",
-    s.parkedCount > 0 ? tag("#f5c451", "#0b1220", `⚓${s.parkedCount}`) : "",
-    s.bounty > 0 ? tag("#16a34a", "#fff", `💰${s.bounty}`) : "",
+    s.navyAlert ? tag("#dc2626", "#fff", ico("warn"), "animation:pp-blink 1s steps(2) infinite") : "",
+    s.parkedCount > 0 ? tag("#f5c451", "#0b1220", `${ico("anchor")}${s.parkedCount}`) : "",
+    s.bounty > 0 ? tag("#16a34a", "#fff", `${ico("coin")}${s.bounty}`) : "",
     s.treasure ? `<span style="display:inline-block;animation:pp-bob-y 1.2s steps(2) infinite">${chestSvg(2)}</span>` : "",
   ].filter(Boolean);
   const bottom = tags.length

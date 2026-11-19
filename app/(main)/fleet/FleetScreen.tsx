@@ -10,7 +10,10 @@ import { api } from "@/lib/api";
 import { timeAgo } from "@/lib/format";
 import type { BattleView, CrewView, FleetState, RivalView } from "@/lib/fleetTypes";
 import { ITEMS, NAVAL, NPCS, npcName, repairCost, SHIPS, shipOf, type ItemDef } from "@/lib/naval";
+import { ITEM_PX } from "@/lib/pixelIcons";
 import { shipSvg } from "@/lib/shipSprites";
+import Px from "@/components/Px";
+import PxText from "@/components/PxText";
 
 type Tab = "sea" | "yard" | "npc" | "log";
 const TABS: [Tab, string][] = [
@@ -94,7 +97,7 @@ export default function FleetScreen() {
       {toastNode}
       {confirmNode}
       {replay && state && <BattleReplay battle={replay} myId={state.me.id} onClose={() => setReplay(null)} />}
-      <PageHeader title="해적단" right={state && <span className="text-sm font-bold text-gold-400">💰 {balance}</span>} />
+      <PageHeader title="해적단" right={state && <span className="text-sm font-bold text-gold-400"><Px name="coin" size="1.15em" /> {balance}</span>} />
       <div className="space-y-4 px-5">
         <ErrorText>{error}</ErrorText>
         {!state && !error && <div className="h-56 animate-pulse rounded-2xl bg-sea-800" />}
@@ -114,7 +117,7 @@ export default function FleetScreen() {
                       tab === k ? "bg-gold-400 text-sea-950" : "bg-sea-800 text-slate-300"
                     }`}
                   >
-                    {label}
+                    <PxText text={label} />
                   </button>
                 ))}
               </div>
@@ -167,7 +170,7 @@ function FoundCrew({ onDone }: { onDone: (s: FleetState) => void }) {
           }
         }}
       >
-        🏴‍☠️ 해적단 창단 (무료)
+        <Px name="flag" size="1.15em" /> 해적단 창단 (무료)
       </Button>
     </section>
   );
@@ -189,7 +192,7 @@ function CrewCard({ crew, balance, busy, onRepair }: { crew: CrewView; balance: 
   return (
     <section className="border-2 border-sea-600 bg-sea-800 p-4 shadow-[4px_4px_0_rgba(0,0,0,.45)]">
       <div className="flex items-center gap-2">
-        <span className="text-2xl">{crew.flag}</span>
+        <PxText text={crew.flag} size={30} />
         <div className="min-w-0 flex-1">
           <div className="truncate text-xl font-black">{crew.name}</div>
           <div className="text-xs text-slate-400">
@@ -206,7 +209,7 @@ function CrewCard({ crew, balance, busy, onRepair }: { crew: CrewView; balance: 
 
       <div className="mt-3">
         <div className="mb-1 flex justify-between text-xs">
-          <span className="font-bold">❤️ 체력 {crew.hp}/{crew.stats.maxHp}</span>
+          <span className="font-bold"><Px name="heart" size="1.15em" /> 체력 {crew.hp}/{crew.stats.maxHp}</span>
           <span className="text-slate-400">시간당 +{crew.stats.regenPerHour}</span>
         </div>
         <HpBar hp={crew.hp} max={crew.stats.maxHp} />
@@ -216,7 +219,7 @@ function CrewCard({ crew, balance, busy, onRepair }: { crew: CrewView; balance: 
             disabled={busy || balance < cost}
             className="mt-2 h-9 w-full bg-sea-700 text-xs font-bold disabled:opacity-40"
           >
-            🔧 바로 수리 · 💰{cost}
+            <Px name="wrench" size="1.15em" /> 바로 수리 · <Px name="coin" size="1.15em" />{cost}
           </button>
         )}
       </div>
@@ -229,7 +232,7 @@ function CrewCard({ crew, balance, busy, onRepair }: { crew: CrewView; balance: 
 
       {crew.overlord && (
         <div className="mt-3 border-2 border-red-500/60 bg-red-950/40 px-3 py-2 text-sm">
-          ⛓ <b>{crew.overlord.name}</b> 휘하 · {until(crew.overlord.until)}까지
+          <Px name="chain" size="1.15em" /> <b>{crew.overlord.name}</b> 휘하 · {until(crew.overlord.until)}까지
           <div className="text-xs text-slate-300">
             버는 금화의 {crew.overlord.rate}% 상납 (낸 상납 {crew.overlord.paid}/{NAVAL.tributeCap}). 바다 탭에서 독립 전쟁을 걸 수 있어요.
           </div>
@@ -237,11 +240,11 @@ function CrewCard({ crew, balance, busy, onRepair }: { crew: CrewView; balance: 
       )}
       {crew.vassals.length > 0 && (
         <div className="mt-3 border-2 border-gold-400/60 bg-gold-400/10 px-3 py-2 text-sm">
-          👑 휘하 해적단: {crew.vassals.map((v) => `${v.name}(${until(v.until)}까지)`).join(", ")}
+          <Px name="crown" size="1.15em" /> 휘하 해적단: {crew.vassals.map((v) => `${v.name}(${until(v.until)}까지)`).join(", ")}
         </div>
       )}
       {crew.protectedUntil && !crew.overlord && (
-        <p className="mt-2 text-xs text-sky-300">🛡 {until(crew.protectedUntil)}까지 보호 중 (먼저 공격하면 풀려요)</p>
+        <p className="mt-2 text-xs text-sky-300"><Px name="shield" size="1.15em" /> {until(crew.protectedUntil)}까지 보호 중 (먼저 공격하면 풀려요)</p>
       )}
     </section>
   );
@@ -250,7 +253,9 @@ function CrewCard({ crew, balance, busy, onRepair }: { crew: CrewView; balance: 
 function Stat({ label, value, gold }: { label: string; value: number; gold?: boolean }) {
   return (
     <div className="bg-sea-900 py-2 shadow-[2px_2px_0_rgba(0,0,0,.4)]">
-      <div className="text-[11px] text-slate-400">{label}</div>
+      <div className="text-[11px] text-slate-400">
+        <PxText text={label} />
+      </div>
       <div className={`font-mono text-lg font-black ${gold ? "text-gold-400" : ""}`}>{value}</div>
     </div>
   );
@@ -276,14 +281,14 @@ function SeaTab({ state, busy, onAttack }: { state: FleetState; busy: boolean; o
                 <div className="w-16 shrink-0" dangerouslySetInnerHTML={{ __html: shipSvg(r.shipTier, 3, true) }} />
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-bold">
-                    {r.flag} {r.name}
+                    <PxText text={r.flag} /> {r.name}
                   </div>
                   <div className="truncate text-[11px] text-slate-400">
                     <Nickname name={r.nickname} color={r.nameColor} effect={r.nameEffect} /> · {r.title} · {r.wins}승 {r.losses}패
                   </div>
                   <div className="text-[11px]">
-                    <span className={danger}>⭐{r.power}</span> · ❤️{r.hpPct}%
-                    {r.overlordName && <span className="text-red-400"> · ⛓{r.overlordName} 휘하</span>}
+                    <span className={danger}><Px name="star" size="1.15em" />{r.power}</span> · <Px name="heart" size="1.15em" />{r.hpPct}%
+                    {r.overlordName && <span className="text-red-400"> · <Px name="chain" size="1.15em" />{r.overlordName} 휘하</span>}
                   </div>
                 </div>
                 {r.attack.ok ? (
@@ -294,7 +299,7 @@ function SeaTab({ state, busy, onAttack }: { state: FleetState; busy: boolean; o
                       r.attack.independence ? "bg-sky-400 text-sea-950" : "bg-red-600 text-white"
                     }`}
                   >
-                    {r.attack.independence ? "🗽 독립" : "⚔️ 공격"}
+                    {r.attack.independence ? <PxText text="🗽 독립" /> : <PxText text="⚔️ 공격" />}
                   </button>
                 ) : (
                   <span className="w-16 shrink-0 text-center text-[11px] leading-tight text-slate-500">{r.attack.reason}</span>
@@ -316,7 +321,7 @@ function YardTab({ crew, balance, busy, onBuy }: { crew: CrewView; balance: numb
   return (
     <section className="space-y-5">
       <div>
-        <h2 className="mb-2 font-bold">⛵ 배 업그레이드</h2>
+        <h2 className="mb-2 font-bold"><Px name="ship" size="1.15em" /> 배 업그레이드</h2>
         {next ? (
           <div className="flex items-center gap-3 bg-sea-800 p-3 shadow-[2px_2px_0_rgba(0,0,0,.4)]">
             <div className="w-20 shrink-0" dangerouslySetInnerHTML={{ __html: shipSvg(next.tier, 4) }} />
@@ -324,7 +329,7 @@ function YardTab({ crew, balance, busy, onBuy }: { crew: CrewView; balance: numb
               <div className="font-black">{next.name}</div>
               <div className="text-xs text-slate-400">{next.desc}</div>
               <div className="text-xs">
-                ❤️{ship.hp}→{next.hp} · ⚔️{ship.atk}→{next.atk} · 🛡{ship.def}→{next.def}
+                <Px name="heart" size="1.15em" />{ship.hp}→{next.hp} · <Px name="swords" size="1.15em" />{ship.atk}→{next.atk} · <Px name="shield" size="1.15em" />{ship.def}→{next.def}
               </div>
               <div className="text-xs">
                 무기 칸 {ship.weaponSlots}→{next.weaponSlots} · 방어 칸 {ship.armorSlots}→{next.armorSlots}
@@ -335,17 +340,17 @@ function YardTab({ crew, balance, busy, onBuy }: { crew: CrewView; balance: numb
               onClick={() => onBuy({ kind: "ship" }, `⛵ ${next.name}(으)로 갈아탈까요?`, `💰 ${next.price}두블룬`)}
               className="h-11 shrink-0 bg-gold-400 px-3 text-sm font-black text-sea-950 shadow-[2px_2px_0_rgba(0,0,0,.5)] disabled:opacity-40"
             >
-              💰{next.price}
+              <Px name="coin" size="1.15em" />{next.price}
             </button>
           </div>
         ) : (
-          <p className="text-sm text-gold-400">👻 최고의 배, {ship.name}을(를) 타고 있어요.</p>
+          <p className="text-sm text-gold-400"><Px name="ghost" size="1.15em" /> 최고의 배, {ship.name}을(를) 타고 있어요.</p>
         )}
       </div>
       <ItemList kind="weapon" title="⚔️ 무기" note={`무기 칸 ${ship.weaponSlots}개: 강한 것부터 자동 장착`} crew={crew} balance={balance} busy={busy} onBuy={onBuy} />
       <ItemList kind="armor" title="🛡 방어구" note={`방어 칸 ${ship.armorSlots}개: 강한 것부터 자동 장착`} crew={crew} balance={balance} busy={busy} onBuy={onBuy} />
       <p className="bg-sea-800 px-3 py-2 text-xs text-slate-300">
-        💡 장비는 소모품이에요. 해전 뒤 이긴 쪽은 {NAVAL.breakWinner}%, 진 쪽은 {NAVAL.breakLoser}% 확률로 장착한 장비가 하나씩 부서져요 (목수가 줄여 줘요).
+        <Px name="bulb" size="1.15em" /> 장비는 소모품이에요. 해전 뒤 이긴 쪽은 {NAVAL.breakWinner}%, 진 쪽은 {NAVAL.breakLoser}% 확률로 장착한 장비가 하나씩 부서져요 (목수가 줄여 줘요).
       </p>
     </section>
   );
@@ -371,7 +376,9 @@ function ItemList({
   const equipped = new Map(crew.stats.equipped.map((e) => [e.id, e.count]));
   return (
     <div>
-      <h2 className="font-bold">{title}</h2>
+      <h2 className="font-bold">
+        <PxText text={title} />
+      </h2>
       <p className="mb-2 text-xs text-slate-400">{note}</p>
       <ul className="space-y-1.5">
         {ITEMS.filter((i) => i.kind === kind).map((it) => {
@@ -379,10 +386,10 @@ function ItemList({
           const on = equipped.get(it.id) ?? 0;
           return (
             <li key={it.id} className="flex items-center gap-2 bg-sea-800 px-3 py-2 shadow-[2px_2px_0_rgba(0,0,0,.4)]">
-              <span className="text-2xl">{it.icon}</span>
+              <Px name={ITEM_PX[it.id] ?? "cannon"} size={32} />
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-bold">
-                  {it.name} <span className="font-mono text-xs text-slate-400">{kind === "weapon" ? "⚔️" : "🛡"}+{it.power}</span>
+                  {it.name} <span className="font-mono text-xs text-slate-400">{kind === "weapon" ? <PxText text="⚔️" /> : <PxText text="🛡" />}+{it.power}</span>
                 </div>
                 <div className="text-[11px] text-slate-400">
                   보유 {have}
@@ -393,10 +400,10 @@ function ItemList({
                 <button
                   key={q}
                   disabled={busy || balance < it.price * q}
-                  onClick={() => onBuy({ kind: "item", id: it.id, qty: q }, `${it.icon} ${it.name} ${q}개`, `💰 ${it.price * q}두블룬`)}
+                  onClick={() => onBuy({ kind: "item", id: it.id, qty: q }, `${it.kind === "weapon" ? "⚔️" : "🛡"} ${it.name} ${q}개`, `💰 ${it.price * q}두블룬`)}
                   className="h-10 shrink-0 bg-sea-700 px-2 text-xs font-bold disabled:opacity-40"
                 >
-                  {q > 1 ? `×${q} ` : ""}💰{it.price * q}
+                  {q > 1 ? `×${q} ` : ""}<Px name="coin" size="1.15em" />{it.price * q}
                 </button>
               ))}
             </li>
@@ -418,7 +425,7 @@ function NpcTab({ crew, balance, busy, onBuy }: { crew: CrewView; balance: numbe
           const price = n.prices[lv];
           return (
             <li key={n.role} className="flex items-center gap-3 bg-sea-800 px-3 py-2.5 shadow-[2px_2px_0_rgba(0,0,0,.4)]">
-              <span className={`text-3xl ${lv ? "" : "opacity-40 grayscale"}`}>{n.icon}</span>
+              <Px name={`npc-${n.role}`} size={36} className={lv ? "" : "opacity-40 grayscale"} />
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-black">
                   {npcName(crew.name, n.role)}
@@ -438,14 +445,14 @@ function NpcTab({ crew, balance, busy, onBuy }: { crew: CrewView; balance: numbe
                   onClick={() =>
                     onBuy(
                       { kind: "npc", role: n.role },
-                      lv ? `${n.icon} ${npcName(crew.name, n.role)} Lv.${lv + 1}` : `${n.icon} ${npcName(crew.name, n.role)} 고용`,
+                      lv ? `👥 ${npcName(crew.name, n.role)} Lv.${lv + 1}` : `👥 ${npcName(crew.name, n.role)} 고용`,
                       `${n.effect(lv + 1)}\n💰 ${price}두블룬`,
                     )
                   }
                   className="h-11 shrink-0 bg-gold-400 px-3 text-xs font-black text-sea-950 shadow-[2px_2px_0_rgba(0,0,0,.5)] disabled:opacity-40"
                 >
                   {lv ? "레벨업" : "고용"}
-                  <br />💰{price}
+                  <br /><Px name="coin" size="1.15em" />{price}
                 </button>
               )}
             </li>
@@ -474,8 +481,8 @@ function LogTab({ battles, myId, onOpen }: { battles: BattleView[]; myId: string
               <span className={`pixel-tag shrink-0 ${won ? "bg-gold-400 text-sea-950" : "bg-slate-600 text-white"}`}>{won ? "WIN" : "LOSE"}</span>
               <div className="min-w-0 flex-1 text-sm">
                 <div className="truncate font-bold">
-                  {log.independence ? "🗽 " : iAmA ? "⚔️ " : "🛡 "}
-                  {other.flag} {other.name}
+                  {log.independence ? <PxText text="🗽 " /> : iAmA ? <PxText text="⚔️ " /> : <PxText text="🛡 " />}
+                  <PxText text={other.flag} /> {other.name}
                   {iAmA ? " 공격" : "의 공격"}
                 </div>
                 <div className="text-[11px] text-slate-400">{timeAgo(b.createdAt)} · 눌러서 다시 보기</div>
@@ -491,12 +498,12 @@ function LogTab({ battles, myId, onOpen }: { battles: BattleView[]; myId: string
 function Rules() {
   return (
     <details className="bg-sea-800 px-3 py-2 text-xs text-slate-300">
-      <summary className="cursor-pointer py-1 text-sm font-bold text-slate-200">📖 해전 규칙</summary>
+      <summary className="cursor-pointer py-1 text-sm font-bold text-slate-200"><Px name="book" size="1.15em" /> 해전 규칙</summary>
       <ul className="mt-1 space-y-1 pb-1">
         <li>· 배 체력·공격·방어로 서로 한 발씩 쏘는 자동 포격전이에요. 운(명중·치명타)도 있어요.</li>
         <li>· 공격해서 이기면 상대가 {NAVAL.vassalDays}일간 휘하가 되어, 활동으로 버는 금화의 {NAVAL.tributeRate}%를 상납해요 (휘하 1회 최대 {NAVAL.tributeCap}).</li>
         <li>· 내 전투력의 절반도 안 되는 상대를 이기면 상납 {NAVAL.tributeRateBully}%·전리품 {NAVAL.lootBully}, 1.5배 강한 상대를 이기면 상납 {NAVAL.tributeRateUnderdog}%·전리품 {NAVAL.lootUnderdog}.</li>
-        <li>· 휘하는 언제든 주인에게 🗽 독립 전쟁을 걸 수 있어요. 이기면 바로 독립하고 낸 상납금을 돌려받아요.</li>
+        <li>· 휘하는 언제든 주인에게 <Px name="chainbreak" size="1.15em" /> 독립 전쟁을 걸 수 있어요. 이기면 바로 독립하고 낸 상납금을 돌려받아요.</li>
         <li>· 휘하인 동안, 풀린 뒤 {NAVAL.freedProtectDays}일, 창단 후 {NAVAL.newCrewProtectDays}일은 다른 해적단이 공격할 수 없어요.</li>
         <li>· 체력이 {NAVAL.minAttackHpPct}% 미만이면 공격할 수 없어요. 시간이 지나면 회복되고, 금화로 바로 수리할 수도 있어요.</li>
         <li>· 해전은 정박 결투(내 정보 탭)와 별개예요. 정박 결투는 정박 횟수, 해전은 함선 실력으로 겨뤄요.</li>

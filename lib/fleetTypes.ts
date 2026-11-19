@@ -53,7 +53,11 @@ export type BattleLog = {
   refund: number; // 독립 성공 시 돌려받은 상납금
   brokenA: { id: string; count: number }[];
   brokenD: { id: string; count: number }[];
+  /** 연출용: 양쪽의 가장 강한 무기·방어구 (예전 기록엔 없음) */
+  gear?: { a: Gear; d: Gear };
 };
+
+export type Gear = { weapon: string | null; armor: string | null };
 
 export type BattleView = { id: string; createdAt: string; log: BattleLog };
 

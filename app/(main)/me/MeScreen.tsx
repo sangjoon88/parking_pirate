@@ -10,6 +10,8 @@ import { Button, ErrorText } from "@/components/ui";
 import { api } from "@/lib/api";
 import { dateTime, duration } from "@/lib/format";
 import { FLAGS, NAME_COLORS, NAME_EFFECTS, SHOP_PRICE } from "@/lib/game";
+import Px from "@/components/Px";
+import PxText from "@/components/PxText";
 
 type Me = {
   id: string;
@@ -180,19 +182,19 @@ export default function MeScreen() {
           <section className="rounded-2xl bg-sea-800 p-4">
             <div className="flex items-start gap-3">
               <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-sea-900 text-3xl">
-                {me.flag}
+                <PxText text={me.flag} size={34} />
               </div>
               <div className="min-w-0">
                 <div className="text-xs font-bold text-gold-400">
                   {data.title}
-                  {data.lordships > 0 && ` · 🏰 영주 ${data.lordships}곳`}
+                  {data.lordships > 0 && <PxText text={` · 🏰 영주 ${data.lordships}곳`} />}
                 </div>
                 <div className="truncate text-2xl font-black">
-                  {data.isKing && "👑 "}
+                  {data.isKing && <PxText text="👑 " />}
                   <Nickname name={me.nickname} color={me.nameColor} effect={me.nameEffect} />
                 </div>
                 <div className="text-xs text-slate-400">
-                  {me.role === "admin" ? "🏴‍☠️ 선단장" : "선원"} · {new Date(me.createdAt).toLocaleDateString("ko-KR")} 승선
+                  {me.role === "admin" ? <PxText text="🏴‍☠️ 선단장" /> : "선원"} · {new Date(me.createdAt).toLocaleDateString("ko-KR")} 승선
                   {" · "}
                   {Math.floor((now - new Date(me.createdAt).getTime()) / 86400_000) + 1}일째
                 </div>
@@ -200,13 +202,13 @@ export default function MeScreen() {
             </div>
             {data.isKing && (
               <div className="mt-3 rounded-xl bg-gold-400/15 px-3 py-2 text-sm font-bold text-gold-400">
-                👑 이달의 해적왕입니다!
+                <Px name="crown" size="1.15em" /> 이달의 해적왕입니다!
               </div>
             )}
             <div className="mt-3 grid grid-cols-2 gap-2 text-center">
               <div className="rounded-xl bg-sea-900 py-2">
                 <div className="text-xs text-slate-400">보유 두블룬</div>
-                <div className="text-xl font-black text-gold-400">💰 {balance}</div>
+                <div className="text-xl font-black text-gold-400"><Px name="coin" size="1.15em" /> {balance}</div>
               </div>
               <div className="rounded-xl bg-sea-900 py-2">
                 <div className="text-xs text-slate-400">이번 달 번 금화</div>
@@ -235,7 +237,7 @@ export default function MeScreen() {
                   tab === k ? "bg-gold-400 text-sea-950" : "bg-sea-800 text-slate-300"
                 }`}
               >
-                {label}
+                <PxText text={label} />
               </button>
             ))}
           </div>
@@ -255,7 +257,7 @@ export default function MeScreen() {
                       b.earned ? "ring-1 ring-gold-400/50" : "opacity-45 grayscale"
                     }`}
                   >
-                    <span className="text-2xl">{b.icon}</span>
+                    <PxText text={b.icon} size={28} />
                     <span className="mt-1 text-[11px] leading-tight font-bold">{b.name}</span>
                     <span className="text-[10px] text-slate-400">{b.earned ? "획득" : b.progress}</span>
                   </button>
@@ -268,7 +270,7 @@ export default function MeScreen() {
         {tab === "shop" && me && (
           <section className="space-y-5">
             <div>
-              <h2 className="mb-1 font-bold">🏴 내 깃발 · 💰{SHOP_PRICE.flag}</h2>
+              <h2 className="mb-1 font-bold"><Px name="flag" size="1.15em" /> 내 깃발 · <Px name="coin" size="1.15em" />{SHOP_PRICE.flag}</h2>
               <p className="mb-2 text-xs text-slate-400">내 닉네임 앞과, 내가 영주인 정박지 핀에 꽂혀요.</p>
               <div className="grid grid-cols-6 gap-2">
                 {FLAGS.map((f) => (
@@ -280,13 +282,13 @@ export default function MeScreen() {
                     }`}
                     aria-label={`깃발 ${f}${f === me.flag ? " (사용 중)" : ""}`}
                   >
-                    {f}
+                    <PxText text={f} size={28} />
                   </button>
                 ))}
               </div>
             </div>
             <div>
-              <h2 className="mb-1 font-bold">🎨 닉네임 색 · 💰{SHOP_PRICE.color}</h2>
+              <h2 className="mb-1 font-bold"><Px name="palette" size="1.15em" /> 닉네임 색 · <Px name="coin" size="1.15em" />{SHOP_PRICE.color}</h2>
               <p className="mb-2 text-xs text-slate-400">선원 명부와 랭킹에서 내 이름이 이 색으로 보여요.</p>
               <div className="grid grid-cols-3 gap-2">
                 {NAME_COLORS.map((c) => (
@@ -304,9 +306,9 @@ export default function MeScreen() {
               </div>
             </div>
             <div>
-              <h2 className="mb-1 font-bold">✨ 닉네임 효과 · 💰{SHOP_PRICE.effect}</h2>
+              <h2 className="mb-1 font-bold"><Px name="sparkle" size="1.15em" /> 닉네임 효과 · <Px name="coin" size="1.15em" />{SHOP_PRICE.effect}</h2>
               <p className="mb-2 text-xs text-slate-400">
-                {me.nameColor ? "닉네임 색 위에 효과를 더해요. 하나만 쓸 수 있어요." : "🔒 닉네임 색을 먼저 사야 효과를 달 수 있어요."}
+                {me.nameColor ? "닉네임 색 위에 효과를 더해요. 하나만 쓸 수 있어요." : <PxText text="🔒 닉네임 색을 먼저 사야 효과를 달 수 있어요." />}
               </p>
               <div className="grid grid-cols-3 gap-2">
                 {NAME_EFFECTS.map((fx) => {
@@ -323,14 +325,16 @@ ${fx.desc}`)}
                       }`}
                     >
                       <Nickname name={locked ? "잠김" : me.nickname} color={me.nameColor ?? "pearl"} effect={fx.id} className="max-w-full truncate" />
-                      <span className="mt-0.5 text-[10px] font-medium text-slate-400">{fx.label}</span>
+                      <span className="mt-0.5 text-[10px] font-medium text-slate-400">
+                        <PxText text={fx.label} />
+                      </span>
                     </button>
                   );
                 })}
               </div>
             </div>
             <p className="rounded-xl bg-sea-800 px-3 py-2 text-xs text-slate-300">
-              💡 현상금 걸기와 보물 묻기는 지도에서 정박지를 눌러서 할 수 있어요.
+              <Px name="bulb" size="1.15em" /> 현상금 걸기와 보물 묻기는 지도에서 정박지를 눌러서 할 수 있어요.
             </p>
           </section>
         )}
@@ -382,7 +386,7 @@ ${fx.desc}`)}
         {tab === "log" && data && (
           <section className="space-y-5">
             <div>
-              <h2 className="mb-2 font-bold">📒 금화 장부</h2>
+              <h2 className="mb-2 font-bold"><Px name="book" size="1.15em" /> 금화 장부</h2>
               {data.doubloons.logs.length === 0 ? (
                 <p className="text-sm text-slate-500">아직 기록이 없어요.</p>
               ) : (
@@ -403,7 +407,7 @@ ${fx.desc}`)}
               )}
             </div>
             <div>
-              <h2 className="mb-2 font-bold">⚓ 내 정박 기록</h2>
+              <h2 className="mb-2 font-bold"><Px name="anchor" size="1.15em" /> 내 정박 기록</h2>
               {data.history.length === 0 ? (
                 <p className="text-sm text-slate-500">아직 정박 기록이 없어요.</p>
               ) : (
