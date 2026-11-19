@@ -25,6 +25,7 @@ type Row = {
   created_by: string;
   discoverer: string;
   parked_count: number | string;
+  parked_ships: number[] | null;
   total_parkings: number | string;
   guard_avg: number | string | null;
   alert_at: Date | string | null;
@@ -56,6 +57,10 @@ export async function listSpots(spotId?: string) {
         (select count(*)::int from parkings p
           where p.spot_id = s.id and p.ended_at is null
             and p.started_at > now() - make_interval(hours => ${PARKING_MAX_HOURS})) as parked_count,
+        (select array_agg(coalesce(c.ship_tier, 0) order by coalesce(c.ship_tier, 0) desc)
+          from parkings p left join crews c on c.user_id = p.user_id
+          where p.spot_id = s.id and p.ended_at is null
+            and p.started_at > now() - make_interval(hours => ${PARKING_MAX_HOURS})) as parked_ships,
         (select count(*)::int from parkings p where p.spot_id = s.id) as total_parkings,
         (select round(avg(r.guard_level)::numeric, 1)::float from spot_reports r
           where r.spot_id = s.id and r.guard_level is not null
@@ -97,6 +102,7 @@ export async function listSpots(spotId?: string) {
       discoverer: r.discoverer,
       discovererIsKing: !!kingId && r.created_by === kingId,
       parkedCount: Number(r.parked_count),
+      parkedShips: (r.parked_ships ?? []).map(Number),
       totalParkings,
       legendary: totalParkings >= LEGEND_PARKINGS,
       guardAvg: r.guard_avg == null ? null : Number(r.guard_avg),

@@ -5,13 +5,13 @@ import PxText from "./PxText";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
-import { guardColor, timeAgo } from "@/lib/format";
+import { timeAgo } from "@/lib/format";
 import { FLEET_SIZE, randomFortune, RADIO_MAX_LEN, REWARD, WEATHERS, WONDER_NOTE_MAX, type WeatherId } from "@/lib/game";
 import { getPosition, type Kakao, type LatLng } from "@/lib/kakao";
 import type { ActiveParking, RadioMessage, SpotSummary, Wonder } from "@/lib/types";
 import { exploredCells, YEOUIDO_CELLS } from "@/lib/yeouido";
-import { crownSvg, pennantSvg } from "@/lib/pinHtml";
-import { chestSvg, pinSvg, wonderSvg } from "@/lib/pixelSprites";
+import { castleSvg, crownSvg, flagSvg, pirateColor, shipMapSvg } from "@/lib/pinHtml";
+import { chestSvg, wonderSvg } from "@/lib/pixelSprites";
 import { useConfirm, useToast } from "./feedback";
 import KakaoMap, { type KakaoMapHandle } from "./KakaoMap";
 import NewSpotSheet, { type ExistingSpot } from "./NewSpotSheet";
@@ -716,19 +716,27 @@ function LegendSheet({ onClose }: { onClose: () => void }) {
     [
       <span key="g" className="flex shrink-0 gap-0.5">
         {[1, 3, 5].map((n) => (
-          <span key={n} dangerouslySetInnerHTML={{ __html: pinSvg({ color: guardColor(n, false), outline: "#0b1220", glyph: "skull", scale: 1 }) }} />
+          <span key={n} dangerouslySetInnerHTML={{ __html: flagSvg(pirateColor(n, false), { scale: 1 }) }} />
         ))}
       </span>,
-      "정박지",
-      "핀 색이 경계 레벨이에요. 초록(느슨) → 빨강(엄격)",
+      "정박지 깃발",
+      "깃발 색이 경계 레벨이에요. 이끼 초록(느슨) → 황토 → 핏빛(엄격)",
     ],
-    [svg(pinSvg({ color: guardColor(null, false), outline: "#0b1220", glyph: "skull", scale: 2 })), "경계 정보 없음", "아직 경계 레벨 제보가 없는 곳. 7일 넘게 확인 안 된 핀은 흐려져요"],
-    [svg(pinSvg({ color: guardColor(null, true), outline: "#0b1220", glyph: "gate", scale: 2 })), "닫힌 정박지", "차단기가 생겼다는 제보가 2건 이상"],
-    [svg(pinSvg({ color: guardColor(1, false), outline: "#0b1220", glyph: "ship", scale: 2 })), "함대 집결", `${FLEET_SIZE}명 이상 정박 중. 지금 가면 보너스`],
-    [svg(pinSvg({ color: guardColor(2, false), outline: "#f5c451", glyph: "skull", scale: 2 })), "전설의 정박지", "누적 정박 100회 이상, 금테"],
-    [<span key="a" className={`${tagCls} bg-gold-400 text-sea-950`}><Px name="anchor" size="1.15em" />2</span>, "핀 아래 태그: 정박 인원", "지금 정박 중인 선원 수"],
-    [svg(pennantSvg(3)), "핀 위 빨간 깃발: 영주", "최근 30일 이곳에 가장 많이 정박한 선원이 있어요. 누군지는 핀을 눌러 확인"],
-    [svg(crownSvg(3)), "핀 위 왕관: 해적왕의 영지", "지난달 해적왕이 영주인 곳 (이번 달 내내)"],
+    [svg(flagSvg(pirateColor(null, false), { scale: 2 })), "검은 해골 깃발", "아직 경계 레벨 제보가 없는 곳. 7일 넘게 확인 안 된 깃발은 흐려져요"],
+    [svg(flagSvg(pirateColor(null, true), { closed: true, scale: 2 })), "찢어진 회색 깃발", "차단기가 생겼다는 제보가 2건 이상인 닫힌 정박지"],
+    [
+      <span key="s" className="flex shrink-0 -space-x-3">
+        {[3, 0].map((t) => (
+          <span key={t} dangerouslySetInnerHTML={{ __html: shipMapSvg(t, 1.2) }} />
+        ))}
+      </span>,
+      "깃발 옆 배: 정박 중",
+      `정박한 선원 해적단의 배예요 (최대 3척). ${FLEET_SIZE}척이면 함대 집결!`,
+    ],
+    [svg(flagSvg(pirateColor(2, false), { scale: 2, gold: true })), "빛나는 깃발: 전설의 정박지", "누적 정박 100회 이상"],
+    [<span key="a" className={`${tagCls} bg-gold-400 text-sea-950`}><Px name="anchor" size="1.15em" />2</span>, "깃발 아래 태그: 정박 인원", "지금 정박 중인 선원 수"],
+    [svg(castleSvg(2.4)), "깃대 위 성: 영주", "최근 30일 이곳에 가장 많이 정박한 선원이 있어요. 누군지는 깃발을 눌러 확인"],
+    [svg(crownSvg(3)), "깃대 위 왕관: 해적왕의 영지", "지난달 해적왕이 영주인 곳 (이번 달 내내)"],
     [<span key="d" className={`${tagCls} bg-green-600 text-white`}><Px name="coin" size="1.15em" />35</span>, "현상금", "'차단기 그대로 없음' 일지를 쓰면 획득"],
     [<span key="e" className={`${tagCls} bg-red-600 text-white`}><Px name="warn" size="1.15em" /></span>, "해군 출몰", "30분 안에 경계 5 제보"],
     [svg(chestSvg(3)), "오늘의 보물상자", "오늘 처음 정박하는 선원이 획득"],

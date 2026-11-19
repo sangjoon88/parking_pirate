@@ -13,6 +13,8 @@ export type SpotSummary = {
   /** 발견자가 이달의 해적왕인지 */
   discovererIsKing: boolean;
   parkedCount: number;
+  /** 지금 정박 중인 선원들의 해적단 배 단계 (해적단이 없으면 0, 높은 순) */
+  parkedShips: number[];
   totalParkings: number;
   /** 누적 정박 100회 이상 */
   legendary: boolean;

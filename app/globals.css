@@ -233,3 +233,18 @@ select {
     transform: translateY(-3px);
   }
 }
+
+/* 지도 깃발 펄럭임: 위에 겹친 두 번째 장면을 켰다 껐다 */
+@keyframes pp-flap {
+  0% {
+    visibility: visible;
+  }
+  50% {
+    visibility: hidden;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [style*="pp-flap"] {
+    animation: none !important;
+  }
+}

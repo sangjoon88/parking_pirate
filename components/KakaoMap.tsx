@@ -4,7 +4,7 @@
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
 import { loadKakao, type Kakao, type LatLng } from "@/lib/kakao";
 import type { RadioMessage, SpotSummary, Wonder } from "@/lib/types";
-import { pinHtml } from "@/lib/pinHtml";
+import { PIN_X_ANCHOR, pinHtml } from "@/lib/pinHtml";
 import { PX_ICONS, PX_PALETTE } from "@/lib/pixelIcons";
 import { compassSvg, spriteSvg, wonderSvg } from "@/lib/pixelSprites";
 import { YEOUIDO_CELLS } from "@/lib/yeouido";
@@ -219,8 +219,8 @@ export default function KakaoMap({
         position: new kakao.maps.LatLng(s.lat, s.lng),
         content: el,
         clickable: true,
-        xAnchor: 0.5,
-        yAnchor: 1, // 핀 끝이 실제 위치
+        xAnchor: PIN_X_ANCHOR,
+        yAnchor: 1, // 깃대 받침이 실제 위치
         zIndex: s.id === selectedId ? 10 : s.status === "closed" ? 2 : 3,
       });
       overlay.setMap(map);
