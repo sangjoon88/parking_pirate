@@ -2,12 +2,10 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
-import { guardColor } from "@/lib/format";
 import { loadKakao, type Kakao, type LatLng } from "@/lib/kakao";
-import { STALE_DAYS } from "@/lib/constants";
-import { FLEET_SIZE } from "@/lib/game";
 import type { RadioMessage, SpotSummary, Wonder } from "@/lib/types";
-import { chestSvg, compassSvg, pinSvg, wonderSvg } from "@/lib/pixelSprites";
+import { pinHtml } from "@/lib/pinHtml";
+import { compassSvg, wonderSvg } from "@/lib/pixelSprites";
 import { YEOUIDO_CELLS } from "@/lib/yeouido";
 
 export type KakaoMapHandle = {
@@ -56,55 +54,6 @@ function radioEl(m: RadioMessage): HTMLElement {
 }
 
 const LONG_PRESS_MS = 600;
-
-/** innerHTML에 넣는 사용자 글자 (닉네임 등) 이스케이프 */
-function esc(t: string): string {
-  return t.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
-}
-
-/** 도트 태그 (각진 모서리 + 검은 그림자) */
-function tag(pos: string, bg: string, fg: string, text: string, extra = "") {
-  return `<span style="position:absolute;${pos};height:16px;padding:0 4px;background:${bg};color:${fg};font:800 11px/16px ui-monospace,Menlo,monospace;white-space:nowrap;border:2px solid #0b1220;box-shadow:2px 2px 0 rgba(0,0,0,.55);${extra}">${text}</span>`;
-}
-
-const PIN_SCALE = 3; // 14x16 도트 → 42x48px
-
-function pinHtml(s: SpotSummary, selected: boolean) {
-  const closed = s.status === "closed";
-  const stale =
-    !closed &&
-    (!s.lastConfirmedAt || Date.now() - new Date(s.lastConfirmedAt).getTime() > STALE_DAYS * 86400_000);
-  const fleet = s.parkedCount >= FLEET_SIZE;
-  const pin = pinSvg({
-    color: guardColor(s.guardAvg, closed),
-    // 전설의 정박지와 선택된 핀은 금테
-    outline: s.legendary || selected ? "#f5c451" : "#0b1220",
-    glyph: closed ? "gate" : fleet ? "ship" : "skull",
-    scale: PIN_SCALE,
-  });
-  const count = s.parkedCount > 0 ? tag("top:2px;right:-8px", "#f5c451", "#0b1220", `⚓${s.parkedCount}`) : "";
-  const bounty = s.bounty > 0 ? tag("bottom:-8px;left:50%;transform:translateX(-50%)", "#16a34a", "#fff", `💰${s.bounty}`) : "";
-  const navy = s.navyAlert ? tag("top:2px;left:-10px", "#dc2626", "#fff", "⚠", "animation:pp-blink 1s steps(2) infinite") : "";
-  // 영주: 깃발 + 닉네임 앞 4글자. 지난달 해적왕이 영주면 금색 👑
-  const lord = s.lord
-    ? tag(
-        "top:50%;left:calc(100% - 6px)",
-        s.kingDomain ? "#f5c451" : "#0b1a2e",
-        s.kingDomain ? "#0b1220" : "#f4f1e8",
-        `${s.kingDomain ? "👑" : "🏰"}${esc(s.lord.nickname.slice(0, 4))}`,
-      )
-    : "";
-  const treasure = s.treasure
-    ? `<span style="position:absolute;top:-18px;left:50%;transform:translateX(-50%);animation:pp-bob 1.2s steps(2) infinite">${chestSvg(2)}</span>`
-    : "";
-  const glow = s.legendary ? "filter:drop-shadow(0 0 6px rgba(245,196,81,.9)) drop-shadow(2px 2px 0 rgba(0,0,0,.5));" : "filter:drop-shadow(2px 2px 0 rgba(0,0,0,.5));";
-  // 오래 확인 안 된 핀은 흐리게 (현상금 표시는 또렷하게 유지)
-  return `
-    <div data-spot="${s.id}" style="position:relative;transform:translateY(-50%) scale(${selected ? 1.2 : 1});transform-origin:bottom center;cursor:pointer;padding:8px">
-      <div style="opacity:${stale ? 0.45 : 1};${glow}">${pin}</div>
-      ${treasure}${count}${navy}${lord}${bounty}
-    </div>`;
-}
 
 export default function KakaoMap({
   ref,
@@ -267,7 +216,8 @@ export default function KakaoMap({
         position: new kakao.maps.LatLng(s.lat, s.lng),
         content: el,
         clickable: true,
-        yAnchor: 0.5,
+        xAnchor: 0.5,
+        yAnchor: 1, // 핀 끝이 실제 위치
         zIndex: s.id === selectedId ? 10 : s.status === "closed" ? 2 : 3,
       });
       overlay.setMap(map);

@@ -222,3 +222,14 @@ select {
     animation: none;
   }
 }
+
+/* 지도 위 보물상자: 위아래로 1칸씩 */
+@keyframes pp-bob-y {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}

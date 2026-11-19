@@ -7,6 +7,7 @@ import { FLEET_SIZE, randomFortune, RADIO_MAX_LEN, REWARD, WEATHERS, WONDER_NOTE
 import { getPosition, type Kakao, type LatLng } from "@/lib/kakao";
 import type { ActiveParking, RadioMessage, SpotSummary, Wonder } from "@/lib/types";
 import { exploredCells, YEOUIDO_CELLS } from "@/lib/yeouido";
+import { crownSvg, pennantSvg } from "@/lib/pinHtml";
 import { chestSvg, pinSvg, wonderSvg } from "@/lib/pixelSprites";
 import { useConfirm, useToast } from "./feedback";
 import KakaoMap, { type KakaoMapHandle } from "./KakaoMap";
@@ -701,7 +702,7 @@ function RadioSheet({ position, onClose, onSent }: { position: LatLng; onClose: 
 /** 지도 표시 설명 */
 function LegendSheet({ onClose }: { onClose: () => void }) {
   const svg = (html: string) => <span className="shrink-0" dangerouslySetInnerHTML={{ __html: html }} />;
-  const tagCls = "pixel-tag shrink-0 border-2 border-[#0b1220]";
+  const tagCls = "pixel-tag shrink-0 border-2 border-[#0b1220] !shadow-[1px_1px_0_rgba(0,0,0,.6)]";
   const rows: [React.ReactNode, string, string][] = [
     [
       <span key="g" className="flex shrink-0 gap-0.5">
@@ -716,9 +717,9 @@ function LegendSheet({ onClose }: { onClose: () => void }) {
     [svg(pinSvg({ color: guardColor(null, true), outline: "#0b1220", glyph: "gate", scale: 2 })), "닫힌 정박지", "차단기가 생겼다는 제보가 2건 이상"],
     [svg(pinSvg({ color: guardColor(1, false), outline: "#0b1220", glyph: "ship", scale: 2 })), "함대 집결", `${FLEET_SIZE}명 이상 정박 중. 지금 가면 보너스`],
     [svg(pinSvg({ color: guardColor(2, false), outline: "#f5c451", glyph: "skull", scale: 2 })), "전설의 정박지", "누적 정박 100회 이상, 금테"],
-    [<span key="a" className={`${tagCls} bg-gold-400 text-sea-950`}>⚓2</span>, "정박 인원", "지금 정박 중인 선원 수"],
-    [<span key="b" className={`${tagCls} bg-sea-900 text-white`}>🏰민수</span>, "영주", "최근 30일 이곳에 가장 많이 정박한 선원"],
-    [<span key="c" className={`${tagCls} bg-gold-400 text-sea-950`}>👑민수</span>, "해적왕의 영지", "지난달 해적왕이 영주인 곳 (이번 달 내내)"],
+    [<span key="a" className={`${tagCls} bg-gold-400 text-sea-950`}>⚓2</span>, "핀 아래 태그: 정박 인원", "지금 정박 중인 선원 수"],
+    [svg(pennantSvg(3)), "핀 위 빨간 깃발: 영주", "최근 30일 이곳에 가장 많이 정박한 선원이 있어요. 누군지는 핀을 눌러 확인"],
+    [svg(crownSvg(3)), "핀 위 왕관: 해적왕의 영지", "지난달 해적왕이 영주인 곳 (이번 달 내내)"],
     [<span key="d" className={`${tagCls} bg-green-600 text-white`}>💰35</span>, "현상금", "'차단기 그대로 없음' 일지를 쓰면 획득"],
     [<span key="e" className={`${tagCls} bg-red-600 text-white`}>⚠</span>, "해군 출몰", "30분 안에 경계 5 제보"],
     [svg(chestSvg(3)), "오늘의 보물상자", "오늘 처음 정박하는 선원이 획득"],
