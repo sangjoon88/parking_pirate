@@ -89,3 +89,136 @@ select {
     2px 2px 0 #7a4d12,
     4px 4px 0 #07111f;
 }
+
+/* ───── 닉네임 효과 (상점) ───── */
+.nick-fx {
+  position: relative;
+  display: inline-block;
+}
+/* 반짝반짝: 이름 위아래로 도트 별이 번갈아 깜빡임 */
+.nick-sparkle::before,
+.nick-sparkle::after {
+  content: "✦";
+  position: absolute;
+  font-size: 0.55em;
+  line-height: 1;
+  color: #fff;
+  text-shadow: 0 0 4px var(--nick);
+  pointer-events: none;
+  animation: nick-twinkle 1.2s steps(2, jump-none) infinite;
+}
+/* 부모가 truncate(overflow hidden)여도 별이 잘리지 않게 안쪽 여백에 둔다 */
+.nick-sparkle {
+  padding: 0 0.45em 0 0.4em;
+}
+.nick-sparkle::before {
+  top: -0.05em;
+  left: 0;
+}
+.nick-sparkle::after {
+  bottom: 0;
+  right: 0;
+  animation-delay: 0.6s;
+}
+@keyframes nick-twinkle {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0.15;
+    transform: scale(0.6);
+  }
+}
+/* 후광: 이름 색으로 은은하게 빛남 */
+.nick-glow {
+  animation: nick-glow 1.8s ease-in-out infinite;
+}
+@keyframes nick-glow {
+  0%,
+  100% {
+    text-shadow: 0 0 2px var(--nick);
+  }
+  50% {
+    text-shadow:
+      0 0 6px var(--nick),
+      0 0 14px var(--nick);
+  }
+}
+/* 물결빛: 흰 빛이 글자를 훑고 지나감 */
+.nick-shimmer {
+  background: linear-gradient(100deg, var(--nick) 40%, #fff 50%, var(--nick) 60%) 0 0 / 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: nick-shimmer 2.4s linear infinite;
+}
+@keyframes nick-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -50% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nick-fx,
+  .nick-fx::before,
+  .nick-fx::after {
+    animation: none !important;
+  }
+}
+
+/* ───── 도트(픽셀) 꾸밈 ───── */
+.pixel-tag {
+  display: inline-block;
+  padding: 1px 5px;
+  font: 800 10px/14px ui-monospace, monospace;
+  letter-spacing: 0.04em;
+  box-shadow: 2px 2px 0 #000;
+}
+
+/* 지도 타일을 낡은 해도처럼 (핀·말풍선은 SVG/텍스트라 영향 없음) */
+.pp-map img[src*="daumcdn.net"] {
+  filter: sepia(0.38) saturate(0.85) hue-rotate(-6deg) brightness(0.98);
+}
+.pp-map-vignette {
+  box-shadow:
+    inset 0 0 0 3px rgba(43, 29, 14, 0.55),
+    inset 0 0 70px rgba(110, 70, 20, 0.45);
+}
+
+/* 해전: 배가 물 위에서 1픽셀씩 흔들림, 맞으면 덜컹 */
+@keyframes pp-ship-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(3px);
+  }
+}
+.pp-bob-ship {
+  animation: pp-ship-bob 1.4s steps(2) infinite;
+}
+@keyframes pp-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  75% {
+    transform: translateX(4px);
+  }
+}
+.pp-shake {
+  animation: pp-shake 0.25s steps(2) 2;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pp-bob-ship,
+  .pp-shake {
+    animation: none;
+  }
+}

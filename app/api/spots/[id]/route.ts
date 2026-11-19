@@ -1,7 +1,7 @@
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, isNull } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { photos, spotReports, users } from "@/db/schema";
+import { guardContacts, photos, spotReports, users } from "@/db/schema";
 import { bad, handle, requireUser } from "@/lib/auth";
 import { balanceOf } from "@/lib/doubloons";
 import { listSpots } from "@/lib/spots";
@@ -19,7 +19,7 @@ export const GET = handle(async (_req: Request, ctx: { params: Promise<{ id: str
   } = await listSpots(id);
   if (!spot) bad("정박지를 찾을 수 없어요.", 404);
 
-  const [reports, spotPhotos, balance] = await Promise.all([
+  const [reports, spotPhotos, balance, guards] = await Promise.all([
     db
       .select({
         id: spotReports.id,
@@ -53,6 +53,19 @@ export const GET = handle(async (_req: Request, ctx: { params: Promise<{ id: str
       .where(and(eq(photos.spotId, id), isNull(photos.reportId)))
       .orderBy(desc(photos.createdAt)),
     balanceOf(user.id),
+    db
+      .select({
+        id: guardContacts.id,
+        label: guardContacts.label,
+        digits: guardContacts.digits,
+        userId: guardContacts.userId,
+        nickname: users.nickname,
+        createdAt: guardContacts.createdAt,
+      })
+      .from(guardContacts)
+      .innerJoin(users, eq(users.id, guardContacts.userId))
+      .where(eq(guardContacts.spotId, id))
+      .orderBy(asc(guardContacts.createdAt)),
   ]);
 
   return NextResponse.json({
@@ -63,6 +76,7 @@ export const GET = handle(async (_req: Request, ctx: { params: Promise<{ id: str
       canDelete: userId === user.id || user.role === "admin",
     })),
     photos: spotPhotos.map(({ userId, ...p }) => ({ ...p, canDelete: userId === user.id || user.role === "admin" })),
+    guards: guards.map(({ userId, ...g }) => ({ ...g, canDelete: userId === user.id || user.role === "admin" })),
     me: { id: user.id, balance },
   });
 });

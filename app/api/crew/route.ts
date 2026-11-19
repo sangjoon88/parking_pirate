@@ -18,6 +18,7 @@ export const GET = handle(async () => {
         status: users.status,
         flag: users.flag,
         nameColor: users.nameColor,
+        nameEffect: users.nameEffect,
         createdAt: users.createdAt,
       })
       .from(users)

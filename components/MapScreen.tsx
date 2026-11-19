@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
-import { timeAgo } from "@/lib/format";
-import { randomFortune, RADIO_MAX_LEN, REWARD, WEATHERS, WONDER_NOTE_MAX, type WeatherId } from "@/lib/game";
+import { guardColor, timeAgo } from "@/lib/format";
+import { FLEET_SIZE, randomFortune, RADIO_MAX_LEN, REWARD, WEATHERS, WONDER_NOTE_MAX, type WeatherId } from "@/lib/game";
 import { getPosition, type Kakao, type LatLng } from "@/lib/kakao";
 import type { ActiveParking, RadioMessage, SpotSummary, Wonder } from "@/lib/types";
 import { exploredCells, YEOUIDO_CELLS } from "@/lib/yeouido";
+import { chestSvg, pinSvg, wonderSvg } from "@/lib/pixelSprites";
 import { useConfirm, useToast } from "./feedback";
 import KakaoMap, { type KakaoMapHandle } from "./KakaoMap";
 import NewSpotSheet, { type ExistingSpot } from "./NewSpotSheet";
@@ -41,7 +42,14 @@ const PURPOSE_HINT: Record<Purpose, string> = {
   radio: "지도를 움직여 📍를 무전 남길 곳에 맞춰 주세요",
 };
 
-export default function MapScreen({ initialFog = false }: { initialFog?: boolean }) {
+export default function MapScreen({
+  initialFog = false,
+  initialSpotId = null,
+}: {
+  initialFog?: boolean;
+  /** 새 소식에서 눌러 들어오면 그 정박지를 열어 준다 */
+  initialSpotId?: string | null;
+}) {
   const mapRef = useRef<KakaoMapHandle>(null);
   const [spots, setSpots] = useState<SpotSummary[]>([]);
   const [radios, setRadios] = useState<RadioMessage[]>([]);
@@ -57,7 +65,9 @@ export default function MapScreen({ initialFog = false }: { initialFog?: boolean
   const [kakao, setKakao] = useState<Kakao | null>(null);
   const [fog, setFog] = useState(initialFog);
   const [hint, setHint] = useState(false);
+  const [legend, setLegend] = useState(false);
   const lastAlertRef = useRef<string | null>(null);
+  const pendingSpotRef = useRef<string | null>(initialSpotId);
   const [toastNode, showToast] = useToast("bottom-40"); // 하단 도구 막대 위로
   const [confirmNode, confirm] = useConfirm();
 
@@ -169,6 +179,17 @@ export default function MapScreen({ initialFog = false }: { initialFog?: boolean
     setSelectedId(s.id);
   }
 
+  // 새 소식에서 온 정박지: 핀 데이터와 지도가 준비되면 한 번만 열기
+  useEffect(() => {
+    const id = pendingSpotRef.current;
+    if (!id || !kakao) return;
+    const s = spots.find((x) => x.id === id);
+    if (!s) return;
+    pendingSpotRef.current = null;
+    mapRef.current?.panTo({ lat: s.lat, lng: s.lng }, 4);
+    setSelectedId(s.id);
+  }, [spots, kakao]);
+
   function dismissHint() {
     setHint(false);
     try {
@@ -232,6 +253,16 @@ export default function MapScreen({ initialFog = false }: { initialFog?: boolean
           }
         }}
       />
+
+      {!placing && !parking && !fog && !hint && (
+        <button
+          onClick={() => setLegend(true)}
+          style={{ top: "calc(env(safe-area-inset-top) + 12px)" }}
+          className="pointer-events-auto absolute right-3 z-20 flex h-9 items-center gap-1 border-2 border-[#2b1d0e] bg-[#f4ead2] px-2.5 text-xs font-black text-[#2b1d0e] shadow-[3px_3px_0_rgba(0,0,0,.45)]"
+        >
+          📖 범례
+        </button>
+      )}
 
       {/* 상단: 날씨 · 정박 배너 · 해도 진행률 · 안내 */}
       <div className="safe-top pointer-events-none absolute inset-x-0 top-0 z-20 space-y-2 px-3 pt-3">
@@ -333,6 +364,8 @@ export default function MapScreen({ initialFog = false }: { initialFog?: boolean
 
       {toastNode}
       {confirmNode}
+
+      {legend && <LegendSheet onClose={() => setLegend(false)} />}
 
       {mode.kind === "menu" && (
         <Sheet onClose={() => setMode({ kind: "idle" })} title={<h2 className="text-lg font-black">무엇을 찍을까요?</h2>}>
@@ -661,6 +694,49 @@ function RadioSheet({ position, onClose, onSent }: { position: LatLng; onClose: 
         {text.length}/{RADIO_MAX_LEN}
       </div>
       <ErrorText>{error}</ErrorText>
+    </Sheet>
+  );
+}
+
+/** 지도 표시 설명 */
+function LegendSheet({ onClose }: { onClose: () => void }) {
+  const svg = (html: string) => <span className="shrink-0" dangerouslySetInnerHTML={{ __html: html }} />;
+  const tagCls = "pixel-tag shrink-0 border-2 border-[#0b1220]";
+  const rows: [React.ReactNode, string, string][] = [
+    [
+      <span key="g" className="flex shrink-0 gap-0.5">
+        {[1, 3, 5].map((n) => (
+          <span key={n} dangerouslySetInnerHTML={{ __html: pinSvg({ color: guardColor(n, false), outline: "#0b1220", glyph: "skull", scale: 1 }) }} />
+        ))}
+      </span>,
+      "정박지",
+      "핀 색이 경계 레벨이에요. 초록(느슨) → 빨강(엄격)",
+    ],
+    [svg(pinSvg({ color: guardColor(null, false), outline: "#0b1220", glyph: "skull", scale: 2 })), "경계 정보 없음", "아직 경계 레벨 제보가 없는 곳. 7일 넘게 확인 안 된 핀은 흐려져요"],
+    [svg(pinSvg({ color: guardColor(null, true), outline: "#0b1220", glyph: "gate", scale: 2 })), "닫힌 정박지", "차단기가 생겼다는 제보가 2건 이상"],
+    [svg(pinSvg({ color: guardColor(1, false), outline: "#0b1220", glyph: "ship", scale: 2 })), "함대 집결", `${FLEET_SIZE}명 이상 정박 중. 지금 가면 보너스`],
+    [svg(pinSvg({ color: guardColor(2, false), outline: "#f5c451", glyph: "skull", scale: 2 })), "전설의 정박지", "누적 정박 100회 이상, 금테"],
+    [<span key="a" className={`${tagCls} bg-gold-400 text-sea-950`}>⚓2</span>, "정박 인원", "지금 정박 중인 선원 수"],
+    [<span key="b" className={`${tagCls} bg-sea-900 text-white`}>🏰민수</span>, "영주", "최근 30일 이곳에 가장 많이 정박한 선원"],
+    [<span key="c" className={`${tagCls} bg-gold-400 text-sea-950`}>👑민수</span>, "해적왕의 영지", "지난달 해적왕이 영주인 곳 (이번 달 내내)"],
+    [<span key="d" className={`${tagCls} bg-green-600 text-white`}>💰35</span>, "현상금", "'차단기 그대로 없음' 일지를 쓰면 획득"],
+    [<span key="e" className={`${tagCls} bg-red-600 text-white`}>⚠</span>, "해군 출몰", "30분 안에 경계 5 제보"],
+    [svg(chestSvg(3)), "오늘의 보물상자", "오늘 처음 정박하는 선원이 획득"],
+    [svg(wonderSvg(2, false)), "궁금한 곳", "누가 확인해 주길 기다리는 곳"],
+  ];
+  return (
+    <Sheet onClose={onClose} title={<h2 className="text-lg font-black">📖 해도 범례</h2>}>
+      <ul className="space-y-2.5 pb-2">
+        {rows.map(([icon, name, desc]) => (
+          <li key={name} className="flex items-center gap-3">
+            <span className="flex w-12 shrink-0 justify-center">{icon}</span>
+            <div className="min-w-0">
+              <div className="text-sm font-bold">{name}</div>
+              <div className="text-xs text-slate-400">{desc}</div>
+            </div>
+          </li>
+        ))}
+      </ul>
     </Sheet>
   );
 }

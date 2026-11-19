@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { GUARD_LABELS, guardColor, timeAgo } from "@/lib/format";
-import { BOUNTY_POST, DESCRIPTION_MAX, FLEET_SIZE, LEGEND_PARKINGS, STASH } from "@/lib/game";
-import type { ActiveParking, SpotPhoto, SpotReport, SpotSummary } from "@/lib/types";
+import { BOUNTY_POST, DESCRIPTION_MAX, FLEET_SIZE, GUARD_LABEL_MAX, LEGEND_PARKINGS, STASH } from "@/lib/game";
+import type { ActiveParking, GuardContact, SpotPhoto, SpotReport, SpotSummary } from "@/lib/types";
 import { AmountSheet, useConfirm } from "./feedback";
 import { PhotoViewer, photoUrl, SpotPhotoStrip } from "./Photos";
 import ReportSheet from "./ReportSheet";
@@ -23,8 +23,14 @@ type Props = {
   onChanged: (message: string) => void;
 };
 
-type Detail = { spot: SpotSummary; reports: SpotReport[]; photos: SpotPhoto[]; me: { id: string; balance: number } };
-type Sub = null | "bounty" | "stash" | "nickname" | "description";
+type Detail = {
+  spot: SpotSummary;
+  reports: SpotReport[];
+  photos: SpotPhoto[];
+  guards: GuardContact[];
+  me: { id: string; balance: number };
+};
+type Sub = null | "bounty" | "stash" | "nickname" | "description" | "guard";
 
 const AMOUNTS = [10, 30, 50, 100] as const;
 /** 처음에 보여 주는 일지 수 (나머지는 "이전 일지 더 보기") */
@@ -85,6 +91,17 @@ export default function SpotSheet({
     setReloadKey((k) => k + 1);
     onChanged(msg);
   };
+
+  async function deleteGuard(g: GuardContact) {
+    const ok = await confirm({ title: "경비원 메모를 지울까요?", message: `${g.label || "경비원"} · ${g.digits}`, confirmLabel: "지우기", danger: true });
+    if (!ok) return;
+    try {
+      await api(`/api/guards/${g.id}`, { method: "DELETE" });
+      changed("👮 경비원 메모를 지웠어요");
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
 
   async function deleteReport(r: SpotReport) {
     const ok = await confirm({
@@ -154,6 +171,10 @@ export default function SpotSheet({
     );
   }
 
+  if (sub === "guard") {
+    return <GuardSheet spot={spot} onClose={() => setSub(null)} onDone={() => changed("👮 경비원 메모를 남겼어요")} />;
+  }
+
   if (sub === "nickname") {
     return <NicknameSheet spot={spot} onClose={() => setSub(null)} onDone={() => changed("✨ 전설의 정박지에 별명을 붙였어요")} />;
   }
@@ -198,6 +219,11 @@ export default function SpotSheet({
         {spot.navyAlert && (
           <Notice tone="red">
             ⚠ <b>해군 출몰!</b> {spot.navyAlert.by}님이 경계 5를 제보 · {timeAgo(spot.navyAlert.at)}
+          </Notice>
+        )}
+        {spot.kingDomain && (
+          <Notice tone="gold">
+            👑 <b>해적왕의 영지</b> · 지난달 해적왕 {spot.kingDomain.nickname}님이 다스리는 곳
           </Notice>
         )}
         {spot.treasure > 0 && (
@@ -252,6 +278,39 @@ export default function SpotSheet({
         )}
       </div>
 
+      {/* 경비원 메모: 누구나 추가, 적은 사람·관리자만 삭제 */}
+      <div className="mt-3 rounded-xl bg-sea-800 px-3 py-2.5">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold text-slate-300">👮 경비원 번호</h3>
+          <button onClick={() => setSub("guard")} className="-mr-1 h-8 px-2 text-xs font-bold text-gold-400">
+            + 추가
+          </button>
+        </div>
+        {!detail ? (
+          <p className="mt-1 text-sm text-slate-500">불러오는 중…</p>
+        ) : detail.guards.length === 0 ? (
+          <p className="mt-1 text-sm text-slate-500">경비원 아저씨 번호 뒷자리를 알면 남겨 주세요.</p>
+        ) : (
+          <ul className="mt-1 divide-y divide-sea-700">
+            {detail.guards.map((g) => (
+              <li key={g.id} className="flex items-center gap-2 py-1.5 text-sm">
+                <span className="font-mono text-base font-black tracking-widest text-gold-400">****-{g.digits}</span>
+                <span className="min-w-0 flex-1 truncate">{g.label || "경비원"}</span>
+                <span className="shrink-0 text-[11px] text-slate-500">{g.nickname}</span>
+                {g.canDelete && (
+                  <button
+                    onClick={() => void deleteGuard(g)}
+                    className="-my-1 h-8 shrink-0 px-1 text-[11px] font-bold text-red-400"
+                  >
+                    지우기
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
       <SpotPhotoStrip
         spotId={spot.id}
         photos={detail?.photos ?? null}
@@ -268,6 +327,7 @@ export default function SpotSheet({
           <span className="font-semibold">
             {spot.lord ? (
               <>
+                {spot.kingDomain && "👑 "}
                 {spot.lord.flag} {spot.lord.nickname}
                 <span className="ml-1 text-xs font-normal text-slate-400">30일 {spot.lord.count}회</span>
               </>
@@ -493,6 +553,65 @@ function DescriptionSheet({ spot, onClose, onDone }: { spot: SpotSummary; onClos
       <div className="mt-1 pb-1 text-right text-xs text-slate-500">
         {text.length}/{DESCRIPTION_MAX}
       </div>
+      <ErrorText>{error}</ErrorText>
+    </Sheet>
+  );
+}
+
+function GuardSheet({ spot, onClose, onDone }: { spot: SpotSummary; onClose: () => void; onDone: () => void }) {
+  const [label, setLabel] = useState("");
+  const [digits, setDigits] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  return (
+    <Sheet
+      onClose={onClose}
+      title={
+        <>
+          <p className="text-xs text-slate-400">👮 경비원 번호</p>
+          <h2 className="truncate text-lg font-black">{spot.name}</h2>
+        </>
+      }
+      footer={
+        <Button
+          className="w-full"
+          disabled={busy || digits.length !== 4}
+          onClick={async () => {
+            setBusy(true);
+            setError("");
+            try {
+              await api(`/api/spots/${spot.id}/guards`, { method: "POST", json: { label, digits } });
+              onDone();
+            } catch (e) {
+              setError((e as Error).message);
+              setBusy(false);
+            }
+          }}
+        >
+          {busy ? "저장 중…" : "남기기"}
+        </Button>
+      }
+    >
+      <label className="block text-sm font-bold text-slate-300">
+        번호 뒷자리 4자리
+        <input
+          value={digits}
+          onChange={(e) => setDigits(e.target.value.replace(/[^0-9]/g, "").slice(0, 4))}
+          inputMode="numeric"
+          placeholder="1234"
+          className="mt-1 h-12 w-full rounded-xl border border-sea-600 bg-sea-800 px-4 font-mono text-xl tracking-[0.3em] text-white outline-none focus:border-gold-400"
+        />
+      </label>
+      <label className="mt-3 block text-sm font-bold text-slate-300">
+        메모 <span className="font-normal text-slate-500">(선택)</span>
+        <input
+          value={label}
+          onChange={(e) => setLabel(e.target.value.slice(0, GUARD_LABEL_MAX))}
+          placeholder="예: 야간 아저씨, 정문 초소"
+          className="mt-1 h-12 w-full rounded-xl border border-sea-600 bg-sea-800 px-4 text-white outline-none focus:border-gold-400"
+        />
+      </label>
+      <p className="mt-2 pb-1 text-xs text-slate-500">전체 번호는 남기지 말고 뒷자리 4자리만 적어요. 선원들만 볼 수 있어요.</p>
       <ErrorText>{error}</ErrorText>
     </Sheet>
   );

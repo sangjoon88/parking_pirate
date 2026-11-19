@@ -57,6 +57,7 @@ export const GET = handle(async () => {
       createdAt: user.createdAt,
       flag: user.flag,
       nameColor: user.nameColor,
+      nameEffect: user.nameEffect,
     },
     doubloons: { total: mine.total, month: mine.month, logs },
     title: titleFor(mine.discoveries),

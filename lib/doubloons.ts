@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { doubloonLogs, users } from "@/db/schema";
 import { HttpError } from "./errors";
 import { lineageShare } from "./game";
+import { NAVAL } from "./naval";
 
 type Reason = (typeof doubloonLogs.$inferInsert)["reason"];
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -42,10 +43,47 @@ export async function spend<T>(
 /** 이번 달 시작 시각 (한국 시간 기준) */
 export const MONTH_START_KST = sql`(date_trunc('month', now() at time zone 'Asia/Seoul') at time zone 'Asia/Seoul')`;
 
-/** 금화 지급. 양수 지급이면 추천인에게 10%가 따라간다. */
+/** 휘하 해적단이 상납하는 수입 (활동으로 번 금화만) */
+const TRIBUTE_REASONS = new Set<Reason>([
+  "discovery",
+  "new_cell",
+  "report",
+  "parking",
+  "bounty",
+  "fleet",
+  "toll",
+  "treasure",
+  "stash_found",
+  "wonder_solved",
+]);
+
+/**
+ * 상납: 해전에서 져서 휘하에 있는 동안, 번 금화의 상납률만큼 주인 해적단에게 넘어간다.
+ * 휘하 1회당 상한이 있고, 주인이 추방됐으면 내지 않는다.
+ */
+async function payTribute(userId: string, amount: number) {
+  const res = await db.execute<{ overlord_id: string; battle_id: string; rate: number; paid: string | number }>(sql`
+    select c.overlord_id, c.vassal_battle_id as battle_id, c.tribute_rate as rate,
+      coalesce((select -sum(l.amount) from doubloon_logs l
+        where l.user_id = c.user_id and l.reason = 'tribute_paid' and l.ref_id = c.vassal_battle_id::text), 0) as paid
+    from crews c join users o on o.id = c.overlord_id and o.status = 'active'
+    where c.user_id = ${userId} and c.vassal_until > now() and c.vassal_battle_id is not null
+  `);
+  const v = res.rows[0];
+  if (!v) return;
+  const t = Math.min(Math.floor((amount * Number(v.rate)) / 100), NAVAL.tributeCap - Number(v.paid));
+  if (t <= 0) return;
+  await db.insert(doubloonLogs).values([
+    { userId, amount: -t, reason: "tribute_paid", refId: v.battle_id },
+    { userId: v.overlord_id, amount: t, reason: "tribute", refId: v.battle_id },
+  ]);
+}
+
+/** 금화 지급. 양수 지급이면 추천인에게 10%가 따라가고, 휘하 해적단이면 상납한다. */
 export async function award(userId: string, amount: number, reason: Reason, refId?: string | null) {
   if (!amount) return;
   await db.insert(doubloonLogs).values({ userId, amount, reason, refId: refId ?? null });
+  if (amount > 0 && TRIBUTE_REASONS.has(reason)) await payTribute(userId, amount);
   if (amount > 0 && reason !== "lineage" && reason !== "lineage_ban") {
     const [me] = await db
       .select({ referrerId: users.referrerId, status: users.status })
@@ -85,7 +123,7 @@ export async function awardedRecently(userId: string, reason: Reason, hours: num
  * "번 금화"로 치는 기록: 양수이면서 환불이 아닌 것.
  * 상점·현상금·보물에 쓴 금화 때문에 랭킹이 떨어지지 않도록 지출은 빼고 센다.
  */
-export const EARNING = sql.raw(`(l.amount > 0 and l.reason <> 'duel_refund')`);
+export const EARNING = sql.raw(`(l.amount > 0 and l.reason not in ('duel_refund', 'independence'))`);
 
 /** 이달의 해적왕: 이번 달 번 금화 1위 (활동 선원, 1개 이상) */
 export async function currentKingId(): Promise<string | null> {
@@ -98,6 +136,27 @@ export async function currentKingId(): Promise<string | null> {
     limit 1
   `);
   return res.rows[0]?.user_id ?? null;
+}
+
+/** 지난달 시작 시각 (한국 시간 기준) */
+const LAST_MONTH_START_KST = sql`(date_trunc('month', (now() at time zone 'Asia/Seoul') - interval '1 month') at time zone 'Asia/Seoul')`;
+
+/**
+ * 지난달 해적왕: 지난달 번 금화 1위. 이번 달 내내 그가 영주인 정박지에 👑 표시.
+ * 이번 달 해적왕과 같은 규칙(활동 선원, 번 금화만)이다.
+ */
+export async function lastMonthKing(): Promise<{ userId: string; nickname: string } | null> {
+  const res = await db.execute<{ user_id: string; nickname: string }>(sql`
+    select l.user_id, u.nickname
+    from doubloon_logs l join users u on u.id = l.user_id
+    where l.created_at >= ${LAST_MONTH_START_KST} and l.created_at < ${MONTH_START_KST}
+      and u.status = 'active' and ${EARNING}
+    group by l.user_id, u.nickname
+    order by sum(l.amount) desc, min(l.created_at) asc
+    limit 1
+  `);
+  const r = res.rows[0];
+  return r ? { userId: r.user_id, nickname: r.nickname } : null;
 }
 
 export type CrewStats = { userId: string; total: number; month: number; discoveries: number };

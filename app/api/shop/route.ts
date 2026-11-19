@@ -3,9 +3,9 @@ import { NextResponse } from "next/server";
 import { users } from "@/db/schema";
 import { bad, handle, readJson, requireUser } from "@/lib/auth";
 import { spend } from "@/lib/doubloons";
-import { FLAGS, NAME_COLORS, SHOP_PRICE } from "@/lib/game";
+import { FLAGS, isNameEffect, NAME_COLORS, SHOP_PRICE } from "@/lib/game";
 
-/** 선상 상점: 깃발, 닉네임 색 */
+/** 선상 상점: 깃발, 닉네임 색, 닉네임 효과(닉네임 색이 있어야 함) */
 export const POST = handle(async (req: Request) => {
   const user = await requireUser();
   const body = await readJson(req);
@@ -23,6 +23,13 @@ export const POST = handle(async (req: Request) => {
     if (user.nameColor === value) bad("이미 쓰고 있는 색이에요.");
     await spend(user.id, SHOP_PRICE.color, "shop", `color:${value}`, (tx) =>
       tx.update(users).set({ nameColor: value }).where(eq(users.id, user.id)),
+    );
+  } else if (item === "effect") {
+    if (!isNameEffect(value)) bad("없는 효과예요.");
+    if (!user.nameColor) bad("닉네임 색을 먼저 사야 효과를 달 수 있어요.");
+    if (user.nameEffect === value) bad("이미 쓰고 있는 효과예요.");
+    await spend(user.id, SHOP_PRICE.effect, "shop", `effect:${value}`, (tx) =>
+      tx.update(users).set({ nameEffect: value }).where(eq(users.id, user.id)),
     );
   } else {
     bad("없는 상품이에요.");

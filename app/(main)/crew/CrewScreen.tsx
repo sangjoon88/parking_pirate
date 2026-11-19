@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AmountSheet, useConfirm, useToast } from "@/components/feedback";
+import Nickname from "@/components/Nickname";
 import PageHeader from "@/components/PageHeader";
 import { ErrorText } from "@/components/ui";
 import { api } from "@/lib/api";
-import { colorOf, DUEL_DAYS, DUEL_STAKES, REWARD } from "@/lib/game";
+import { DUEL_DAYS, DUEL_STAKES, REWARD } from "@/lib/game";
 import type { SpotSummary } from "@/lib/types";
 import { exploredCells, YEOUIDO_CELLS } from "@/lib/yeouido";
 
@@ -22,10 +23,12 @@ type Member = {
   isKing: boolean;
   flag: string;
   nameColor: string | null;
+  nameEffect: string | null;
 };
+type NameStyle = { color: string | null; effect: string | null };
 
 type Entry = { userId: string; nickname: string; score: number };
-type Rankings = { gold: Entry[]; discover: Entry[]; scout: Entry[]; regular: Entry[] };
+type Rankings = { gold: Entry[]; discover: Entry[]; scout: Entry[]; regular: Entry[]; naval: Entry[] };
 type Tab = "tree" | "rank" | "chart";
 
 export default function CrewScreen() {
@@ -95,7 +98,7 @@ export default function CrewScreen() {
 
   const active = crew.filter((c) => c.status === "active").length;
   const kingIds = new Set(crew.filter((c) => c.isKing).map((c) => c.id));
-  const colors = new Map(crew.map((c) => [c.id, colorOf(c.nameColor)]));
+  const colors = new Map<string, NameStyle>(crew.map((c) => [c.id, { color: c.nameColor, effect: c.nameEffect }]));
   const myGold = crew.find((c) => c.id === me?.id)?.doubloons ?? null;
 
   return (
@@ -159,6 +162,7 @@ export default function CrewScreen() {
             <Board title="🚩 발견왕" unit="곳" entries={rankings.discover} kingIds={kingIds} colors={colors} />
             <Board title="🔭 정찰왕" unit="개" entries={rankings.scout} kingIds={kingIds} colors={colors} />
             <Board title="⚓ 단골 선원" unit="회" entries={rankings.regular} kingIds={kingIds} colors={colors} />
+            <Board title="⚔️ 해전왕" unit="승" entries={rankings.naval} kingIds={kingIds} colors={colors} />
           </div>
         )}
 
@@ -210,7 +214,7 @@ function Board({
   unit: string;
   entries: Entry[];
   kingIds: Set<string>;
-  colors: Map<string, string | undefined>;
+  colors: Map<string, NameStyle>;
   highlight?: boolean;
 }) {
   const medals = ["🥇", "🥈", "🥉"];
@@ -224,9 +228,9 @@ function Board({
           {entries.map((e, i) => (
             <li key={e.userId} className="flex items-center gap-2 text-sm">
               <span className="w-6 text-center">{medals[i] ?? i + 1}</span>
-              <span className="flex-1 font-semibold" style={{ color: colors.get(e.userId) }}>
+              <span className="flex-1 font-semibold">
                 {kingIds.has(e.userId) && "👑 "}
-                {e.nickname}
+                <Nickname name={e.nickname} color={colors.get(e.userId)?.color} effect={colors.get(e.userId)?.effect} />
               </span>
               <span className="text-slate-300">
                 {e.score.toLocaleString()}
@@ -256,13 +260,10 @@ function Node({ m, depth, ctx }: { m: Member; depth: number; ctx: Ctx }) {
       <div className="flex items-center gap-2 py-1.5" style={{ paddingLeft: depth * 18 }}>
         {depth > 0 && <span className="text-sea-600">└</span>}
         <div className="min-w-0">
-          <div
-            className={`truncate font-semibold ${banned ? "text-slate-500 line-through" : ""}`}
-            style={{ color: banned ? undefined : colorOf(m.nameColor) }}
-          >
+          <div className={`truncate font-semibold ${banned ? "text-slate-500 line-through" : ""}`}>
             {m.isKing && "👑 "}
             {m.flag}{" "}
-            {m.nickname}
+            {banned ? m.nickname : <Nickname name={m.nickname} color={m.nameColor} effect={m.nameEffect} />}
             {m.id === me?.id && (
               <span className="ml-1.5 rounded bg-gold-400/20 px-1.5 text-[11px] text-gold-400">나</span>
             )}

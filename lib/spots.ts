@@ -2,7 +2,7 @@ import "server-only";
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import { GUARD_AVG_DAYS, PARKING_MAX_HOURS } from "./constants";
-import { currentKingId } from "./doubloons";
+import { currentKingId, lastMonthKing } from "./doubloons";
 import { boosted, bountyFor, LEGEND_PARKINGS, NAVY_ALERT_MINUTES, weatherFor } from "./game";
 import { lordsBySpot } from "./lords";
 import { hasStash, todayTreasure } from "./treasure";
@@ -46,7 +46,7 @@ export function totalBounty(s: {
 
 export async function listSpots(spotId?: string) {
   const where = spotId ? sql`where s.id = ${spotId}` : sql``;
-  const [res, kingId, lords, treasure] = await Promise.all([
+  const [res, kingId, lords, treasure, prevKing] = await Promise.all([
     db.execute<Row>(sql`
       select
         s.id, s.name, s.nickname, s.address, s.lat, s.lng, s.status, s.posted_bounty,
@@ -76,6 +76,7 @@ export async function listSpots(spotId?: string) {
     currentKingId(),
     lordsBySpot(spotId),
     todayTreasure(),
+    lastMonthKing(),
   ]);
   const stashSpots = await hasStash(res.rows.map((r) => r.id));
 
@@ -106,6 +107,7 @@ export async function listSpots(spotId?: string) {
       descriptionAt: iso(r.description_at),
       navyAlert: r.alert_at ? { at: iso(r.alert_at)!, by: r.alert_by ?? "" } : null,
       lord: lords.get(r.id) ?? null,
+      kingDomain: !!prevKing && lords.get(r.id)?.userId === prevKing.userId ? { nickname: prevKing.nickname } : null,
       treasure: !!treasure && treasure.spotId === r.id && !treasure.claimedBy ? treasure.amount : 0,
       stashRumor: stashSpots.has(r.id),
     };

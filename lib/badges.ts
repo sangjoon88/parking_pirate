@@ -22,7 +22,9 @@ export async function badgesFor(
         (select count(*) from doubloon_logs where user_id = ${userId} and reason = 'fleet') as fleets,
         (select count(*) from doubloon_logs where user_id = ${userId} and reason = 'bounty') as bounties,
         (select count(*) from doubloon_logs where user_id = ${userId} and reason in ('treasure', 'stash_found')) as treasures,
-        (select count(*) from doubloon_logs where user_id = ${userId} and reason = 'duel_win') as duel_wins
+        (select count(*) from doubloon_logs where user_id = ${userId} and reason = 'duel_win') as duel_wins,
+        (select count(*) from battles where winner_id = ${userId}) as naval_wins,
+        (select count(*) from battles where attacker_id = ${userId} and independence and winner_id = ${userId}) as liberations
     `),
     db.execute<{ d: string }>(sql`
       select distinct to_char(started_at at time zone 'Asia/Seoul', 'YYYY-MM-DD') as d
@@ -54,6 +56,8 @@ export async function badgesFor(
     treasure: [c.treasures, 1],
     duelist: [c.duel_wins, 1],
     veteran: [Math.floor((Date.now() - opts.createdAt.getTime()) / 86400_000), 100],
+    admiral: [c.naval_wins, 5],
+    liberator: [c.liberations, 1],
   };
 
   return (Object.keys(BADGES) as BadgeId[]).map((id) => {

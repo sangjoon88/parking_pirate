@@ -7,6 +7,7 @@ import { loadKakao, type Kakao, type LatLng } from "@/lib/kakao";
 import { STALE_DAYS } from "@/lib/constants";
 import { FLEET_SIZE } from "@/lib/game";
 import type { RadioMessage, SpotSummary, Wonder } from "@/lib/types";
+import { chestSvg, compassSvg, pinSvg, wonderSvg } from "@/lib/pixelSprites";
 import { YEOUIDO_CELLS } from "@/lib/yeouido";
 
 export type KakaoMapHandle = {
@@ -38,7 +39,7 @@ type Props = {
 function radioEl(m: RadioMessage): HTMLElement {
   const el = document.createElement("div");
   el.style.cssText =
-    "transform:translateY(-100%);margin-top:-6px;max-width:180px;background:#fff;color:#07111f;border-radius:12px;padding:5px 9px;box-shadow:0 2px 8px rgba(0,0,0,.45);font:600 12px/1.35 sans-serif;position:relative";
+    "transform:translateY(-100%);margin-top:-6px;max-width:180px;background:#f4ead2;color:#2b1d0e;border:2px solid #2b1d0e;padding:4px 8px;box-shadow:3px 3px 0 rgba(0,0,0,.45);font:600 12px/1.35 sans-serif;position:relative";
   const who = document.createElement("div");
   who.style.cssText = "font-size:10px;color:#64748b;font-weight:700";
   const mins = Math.max(0, Math.floor((Date.now() - new Date(m.createdAt).getTime()) / 60000));
@@ -48,7 +49,7 @@ function radioEl(m: RadioMessage): HTMLElement {
   body.textContent = m.text;
   const tail = document.createElement("div");
   tail.style.cssText =
-    "position:absolute;left:50%;bottom:-6px;transform:translateX(-50%);border:6px solid transparent;border-top-color:#fff;border-bottom:0";
+    "position:absolute;left:50%;bottom:-8px;transform:translateX(-50%);border:6px solid transparent;border-top-color:#2b1d0e;border-bottom:0";
   el.append(who, body, tail);
   if (m.mine) el.style.outline = "2px solid #f5c451";
   return el;
@@ -56,37 +57,51 @@ function radioEl(m: RadioMessage): HTMLElement {
 
 const LONG_PRESS_MS = 600;
 
+/** innerHTML에 넣는 사용자 글자 (닉네임 등) 이스케이프 */
+function esc(t: string): string {
+  return t.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+}
+
+/** 도트 태그 (각진 모서리 + 검은 그림자) */
+function tag(pos: string, bg: string, fg: string, text: string, extra = "") {
+  return `<span style="position:absolute;${pos};height:16px;padding:0 4px;background:${bg};color:${fg};font:800 11px/16px ui-monospace,Menlo,monospace;white-space:nowrap;border:2px solid #0b1220;box-shadow:2px 2px 0 rgba(0,0,0,.55);${extra}">${text}</span>`;
+}
+
+const PIN_SCALE = 3; // 14x16 도트 → 42x48px
+
 function pinHtml(s: SpotSummary, selected: boolean) {
   const closed = s.status === "closed";
   const stale =
     !closed &&
     (!s.lastConfirmedAt || Date.now() - new Date(s.lastConfirmedAt).getTime() > STALE_DAYS * 86400_000);
-  const color = guardColor(s.guardAvg, closed);
-  const scale = selected ? 1.25 : 1;
   const fleet = s.parkedCount >= FLEET_SIZE;
-  const icon = closed ? "🚧" : fleet ? "⛵" : "☠";
-  const tag = (pos: string, bg: string, fg: string, text: string, extra = "") =>
-    `<span style="position:absolute;${pos};height:20px;padding:0 6px;border-radius:10px;background:${bg};color:${fg};font:800 11px/20px sans-serif;white-space:nowrap;border:2px solid #07111f;${extra}">${text}</span>`;
-  const count = s.parkedCount > 0 ? tag("top:-6px;right:-10px", "#f5c451", "#07111f", String(s.parkedCount)) : "";
+  const pin = pinSvg({
+    color: guardColor(s.guardAvg, closed),
+    // 전설의 정박지와 선택된 핀은 금테
+    outline: s.legendary || selected ? "#f5c451" : "#0b1220",
+    glyph: closed ? "gate" : fleet ? "ship" : "skull",
+    scale: PIN_SCALE,
+  });
+  const count = s.parkedCount > 0 ? tag("top:2px;right:-8px", "#f5c451", "#0b1220", `⚓${s.parkedCount}`) : "";
   const bounty = s.bounty > 0 ? tag("bottom:-8px;left:50%;transform:translateX(-50%)", "#16a34a", "#fff", `💰${s.bounty}`) : "";
-  const navy = s.navyAlert
-    ? tag("top:-6px;left:-12px", "#dc2626", "#fff", "⚠", "animation:pp-blink 1s steps(2) infinite")
-    : "";
+  const navy = s.navyAlert ? tag("top:2px;left:-10px", "#dc2626", "#fff", "⚠", "animation:pp-blink 1s steps(2) infinite") : "";
+  // 영주: 깃발 + 닉네임 앞 4글자. 지난달 해적왕이 영주면 금색 👑
   const lord = s.lord
-    ? `<span style="position:absolute;bottom:-2px;right:-8px;width:22px;height:22px;border-radius:50%;background:#0b1a2e;border:2px solid #f5c451;font-size:12px;line-height:18px;text-align:center">${s.lord.flag}</span>`
+    ? tag(
+        "top:50%;left:calc(100% - 6px)",
+        s.kingDomain ? "#f5c451" : "#0b1a2e",
+        s.kingDomain ? "#0b1220" : "#f4f1e8",
+        `${s.kingDomain ? "👑" : "🏰"}${esc(s.lord.nickname.slice(0, 4))}`,
+      )
     : "";
   const treasure = s.treasure
-    ? `<span style="position:absolute;top:-22px;left:50%;transform:translateX(-50%);font-size:20px;animation:pp-bob 1.2s ease-in-out infinite">📦</span>`
+    ? `<span style="position:absolute;top:-18px;left:50%;transform:translateX(-50%);animation:pp-bob 1.2s steps(2) infinite">${chestSvg(2)}</span>`
     : "";
-  // 전설의 정박지: 금테 + 빛
-  const border = selected ? "#f5c451" : s.legendary ? "#f5c451" : "#fff";
-  const glow = s.legendary ? ",0 0 0 3px #07111f,0 0 14px 4px rgba(245,196,81,.8)" : "";
+  const glow = s.legendary ? "filter:drop-shadow(0 0 6px rgba(245,196,81,.9)) drop-shadow(2px 2px 0 rgba(0,0,0,.5));" : "filter:drop-shadow(2px 2px 0 rgba(0,0,0,.5));";
   // 오래 확인 안 된 핀은 흐리게 (현상금 표시는 또렷하게 유지)
   return `
-    <div data-spot="${s.id}" style="position:relative;transform:translateY(-50%) scale(${scale});transform-origin:bottom center;cursor:pointer;padding:8px">
-      <div style="opacity:${stale ? 0.45 : 1};width:34px;height:34px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:${color};border:3px solid ${border};box-shadow:0 2px 6px rgba(0,0,0,.5)${glow};display:flex;align-items:center;justify-content:center">
-        <span style="transform:rotate(45deg);font-size:16px;line-height:1">${icon}</span>
-      </div>
+    <div data-spot="${s.id}" style="position:relative;transform:translateY(-50%) scale(${selected ? 1.2 : 1});transform-origin:bottom center;cursor:pointer;padding:8px">
+      <div style="opacity:${stale ? 0.45 : 1};${glow}">${pin}</div>
       ${treasure}${count}${navy}${lord}${bounty}
     </div>`;
 }
@@ -145,8 +160,9 @@ export default function KakaoMap({
       meRef.current = null;
       if (!p) return;
       const el = document.createElement("div");
+      // 내 위치: 도트 느낌의 네모 점
       el.style.cssText =
-        "width:18px;height:18px;border-radius:50%;background:#3b82f6;border:3px solid #fff;box-shadow:0 0 0 6px rgba(59,130,246,.25)";
+        "width:16px;height:16px;background:#3b82f6;border:3px solid #fff;box-shadow:0 0 0 4px rgba(59,130,246,.3),3px 3px 0 4px rgba(0,0,0,.35)";
       meRef.current = new kakao.maps.CustomOverlay({
         position: new kakao.maps.LatLng(p.lat, p.lng),
         content: el,
@@ -294,11 +310,8 @@ export default function KakaoMap({
     wonderRef.current = wonders.map((w) => {
       const el = document.createElement("div");
       el.setAttribute("data-spot", "wonder"); // 길게 누르기 대상에서 제외
-      el.style.cssText =
-        "transform:translateY(-50%);width:30px;height:30px;border-radius:50%;background:#7c3aed;border:3px solid " +
-        (w.mine ? "#f5c451" : "#fff") +
-        ";box-shadow:0 2px 6px rgba(0,0,0,.5);color:#fff;font:900 16px/24px sans-serif;text-align:center;cursor:pointer";
-      el.textContent = "?";
+      el.style.cssText = "transform:translateY(-50%);cursor:pointer;filter:drop-shadow(2px 2px 0 rgba(0,0,0,.5))";
+      el.innerHTML = wonderSvg(3, w.mine);
       el.addEventListener("click", (e) => {
         e.stopPropagation();
         cb.current.onWonderTap?.(w.id);
@@ -337,8 +350,14 @@ export default function KakaoMap({
     <div className="absolute inset-0">
       <div
         ref={containerRef}
-        className="h-full w-full select-none"
+        className="pp-map h-full w-full select-none"
         style={{ WebkitTouchCallout: "none", WebkitUserSelect: "none" }}
+      />
+      {/* 대항해시대 해도 느낌: 가장자리 양피지 그림자 + 나침반 (터치는 통과) */}
+      <div className="pp-map-vignette pointer-events-none absolute inset-0" />
+      <div
+        className="pointer-events-none absolute right-3 bottom-28 opacity-80"
+        dangerouslySetInnerHTML={{ __html: compassSvg(4) }}
       />
       {error && (
         <div className="absolute inset-0 flex items-center justify-center bg-sea-950 p-8 text-center text-slate-300">

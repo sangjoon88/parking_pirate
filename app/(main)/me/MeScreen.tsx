@@ -4,11 +4,12 @@ import { useCallback, useEffect, useState } from "react";
 import DuelPanel from "@/components/DuelPanel";
 import { useConfirm, useToast } from "@/components/feedback";
 import InstallGuide from "@/components/InstallGuide";
+import Nickname from "@/components/Nickname";
 import PageHeader from "@/components/PageHeader";
 import { Button, ErrorText } from "@/components/ui";
 import { api } from "@/lib/api";
 import { dateTime, duration } from "@/lib/format";
-import { colorOf, FLAGS, NAME_COLORS, SHOP_PRICE } from "@/lib/game";
+import { FLAGS, NAME_COLORS, NAME_EFFECTS, SHOP_PRICE } from "@/lib/game";
 
 type Me = {
   id: string;
@@ -17,6 +18,7 @@ type Me = {
   createdAt: string;
   flag: string;
   nameColor: string | null;
+  nameEffect: string | null;
 };
 type Invite = { code: string; expiresAt: string; usedAt: string | null; usedBy: string | null };
 type History = { id: string; spotName: string; startedAt: string; endedAt: string | null };
@@ -62,6 +64,13 @@ const REASON_LABEL: Record<string, string> = {
   duel_win: "결투 승리",
   duel_refund: "결투 환불",
   anniversary: "승선 기념일",
+  wonder_solved: "궁금한 곳 해결",
+  naval_shop: "해적단 구매",
+  naval_loot: "해전 전리품",
+  naval_defense: "해전 방어 성공",
+  tribute: "휘하 해적단 상납",
+  tribute_paid: "상납",
+  independence: "독립 전쟁 승리 (상납금 회수)",
 };
 
 export default function MeScreen() {
@@ -124,7 +133,7 @@ export default function MeScreen() {
     }
   }
 
-  async function buy(item: "flag" | "color", value: string, label: string) {
+  async function buy(item: "flag" | "color" | "effect", value: string, label: string) {
     const price = SHOP_PRICE[item];
     const ok = await confirm({
       title: "🛒 구매할까요?",
@@ -178,9 +187,9 @@ export default function MeScreen() {
                   {data.title}
                   {data.lordships > 0 && ` · 🏰 영주 ${data.lordships}곳`}
                 </div>
-                <div className="truncate text-2xl font-black" style={{ color: colorOf(me.nameColor) }}>
+                <div className="truncate text-2xl font-black">
                   {data.isKing && "👑 "}
-                  {me.nickname}
+                  <Nickname name={me.nickname} color={me.nameColor} effect={me.nameEffect} />
                 </div>
                 <div className="text-xs text-slate-400">
                   {me.role === "admin" ? "🏴‍☠️ 선단장" : "선원"} · {new Date(me.createdAt).toLocaleDateString("ko-KR")} 승선
@@ -292,6 +301,32 @@ export default function MeScreen() {
                     {c.label}
                   </button>
                 ))}
+              </div>
+            </div>
+            <div>
+              <h2 className="mb-1 font-bold">✨ 닉네임 효과 · 💰{SHOP_PRICE.effect}</h2>
+              <p className="mb-2 text-xs text-slate-400">
+                {me.nameColor ? "닉네임 색 위에 효과를 더해요. 하나만 쓸 수 있어요." : "🔒 닉네임 색을 먼저 사야 효과를 달 수 있어요."}
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                {NAME_EFFECTS.map((fx) => {
+                  const on = fx.id === me.nameEffect;
+                  const locked = !me.nameColor;
+                  return (
+                    <button
+                      key={fx.id}
+                      disabled={locked}
+                      onClick={() => !on && buy("effect", fx.id, `닉네임 효과 ${fx.label}
+${fx.desc}`)}
+                      className={`flex h-16 flex-col items-center justify-center rounded-xl text-sm font-black ${
+                        on ? "bg-sea-700 ring-2 ring-gold-400" : `bg-sea-800 active:bg-sea-700 ${locked || balance < SHOP_PRICE.effect ? "opacity-40" : ""}`
+                      }`}
+                    >
+                      <Nickname name={locked ? "잠김" : me.nickname} color={me.nameColor ?? "pearl"} effect={fx.id} className="max-w-full truncate" />
+                      <span className="mt-0.5 text-[10px] font-medium text-slate-400">{fx.label}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
             <p className="rounded-xl bg-sea-800 px-3 py-2 text-xs text-slate-300">

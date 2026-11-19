@@ -1,6 +1,9 @@
 import { sql } from "drizzle-orm";
 import {
+  boolean,
   check,
+  jsonb,
+  primaryKey,
   customType,
   doublePrecision,
   index,
@@ -23,6 +26,8 @@ export const users = pgTable("users", {
   // 상점에서 산 꾸미기
   flag: text("flag").notNull().default("☠"),
   nameColor: text("name_color"),
+  /** 닉네임 효과 (반짝이 등). 닉네임 색이 있어야 살 수 있다 */
+  nameEffect: text("name_effect"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -141,6 +146,12 @@ export const doubloonLogs = pgTable(
         "duel_refund",
         "anniversary",
         "wonder_solved",
+        "naval_shop",
+        "naval_loot",
+        "naval_defense",
+        "tribute",
+        "tribute_paid",
+        "independence",
       ],
     }).notNull(),
     refId: text("ref_id"),
@@ -269,4 +280,96 @@ export const photos = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("photos_spot_idx").on(t.spotId, t.createdAt), index("photos_report_idx").on(t.reportId)],
+);
+
+/** 경비원 메모: 정박지마다 여러 개. 번호는 뒷자리 4자리만 */
+export const guardContacts = pgTable(
+  "guard_contacts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    spotId: uuid("spot_id")
+      .notNull()
+      .references(() => spots.id),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    label: text("label").notNull().default(""),
+    digits: text("digits").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("guard_contacts_spot_idx").on(t.spotId),
+    check("guard_digits_4", sql`${t.digits} ~ '^[0-9]{4}$'`),
+    check("guard_label_length", sql`char_length(${t.label}) <= 30`),
+  ],
+);
+
+/** 해적단: 선원 한 명당 하나 (계보와 상관없이 독립) */
+export const crews = pgTable("crews", {
+  userId: uuid("user_id")
+    .primaryKey()
+    .references(() => users.id),
+  name: text("name").notNull().unique(),
+  shipTier: integer("ship_tier").notNull().default(0),
+  /** 체력: hp_at 시점의 값. 지금 체력은 회복 속도로 계산 */
+  hp: integer("hp").notNull(),
+  hpAt: timestamp("hp_at", { withTimezone: true }).notNull().defaultNow(),
+  /** 휘하: 이 해적단을 거느린 해적단과 기한 */
+  overlordId: uuid("overlord_id").references((): AnyPgColumn => crews.userId),
+  vassalUntil: timestamp("vassal_until", { withTimezone: true }),
+  vassalBattleId: uuid("vassal_battle_id"),
+  tributeRate: integer("tribute_rate").notNull().default(0),
+  /** 이 시각까지 다른 해적단이 공격할 수 없음 (창단·독립 직후) */
+  protectedUntil: timestamp("protected_until", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** 해적단 무기·방어구 창고 (소모품, 개수) */
+export const crewItems = pgTable(
+  "crew_items",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => crews.userId),
+    itemId: text("item_id").notNull(),
+    qty: integer("qty").notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.itemId] }), check("crew_items_qty", sql`${t.qty} >= 0`)],
+);
+
+/** 해적단 NPC 선원 (요리사, 의사 …) 과 레벨 */
+export const crewNpcs = pgTable(
+  "crew_npcs",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => crews.userId),
+    role: text("role").notNull(),
+    level: integer("level").notNull().default(1),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.role] })],
+);
+
+/** 해전 기록 */
+export const battles = pgTable(
+  "battles",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    attackerId: uuid("attacker_id")
+      .notNull()
+      .references(() => crews.userId),
+    defenderId: uuid("defender_id")
+      .notNull()
+      .references(() => crews.userId),
+    winnerId: uuid("winner_id").notNull(),
+    independence: boolean("independence").notNull().default(false),
+    /** 전투 재생용 기록 (양쪽 상태, 턴별 포격, 부서진 장비, 결과) */
+    log: jsonb("log").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("battles_attacker_idx").on(t.attackerId, t.createdAt),
+    index("battles_defender_idx").on(t.defenderId, t.createdAt),
+    index("battles_created_idx").on(t.createdAt),
+  ],
 );

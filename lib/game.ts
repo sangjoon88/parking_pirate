@@ -56,7 +56,9 @@ export type BadgeId =
   | "lord"
   | "treasure"
   | "duelist"
-  | "veteran";
+  | "veteran"
+  | "admiral"
+  | "liberator";
 
 export const BADGES: Record<BadgeId, { icon: string; name: string; desc: string }> = {
   pioneer: { icon: "🚩", name: "개척자", desc: "정박지를 처음 발견" },
@@ -70,6 +72,8 @@ export const BADGES: Record<BadgeId, { icon: string; name: string; desc: string 
   treasure: { icon: "📦", name: "보물 사냥꾼", desc: "보물상자나 묻힌 보물 발견" },
   duelist: { icon: "⚔️", name: "결투왕", desc: "결투에서 승리" },
   veteran: { icon: "🎖️", name: "100일 선원", desc: "승선 100일" },
+  admiral: { icon: "⚓", name: "제독", desc: "해전 5승" },
+  liberator: { icon: "🗽", name: "독립투사", desc: "독립 전쟁에서 승리" },
 };
 
 export const FORTUNES = [
@@ -108,6 +112,8 @@ export const RADIO_COOLDOWN_MINUTES = 3;
 export const WONDER_NOTE_MAX = 100;
 export const WONDER_MAX_OPEN = 10; // 한 선원이 동시에 찍어 둘 수 있는 궁금한 곳
 export const DESCRIPTION_MAX = 500;
+export const GUARD_LABEL_MAX = 30; // 경비원 메모 (예: 야간 아저씨)
+export const GUARD_CONTACTS_MAX = 10; // 정박지당 경비원 메모 수
 
 /* 사진 (DB 저장: Neon 무료 0.5GB 안에서 쓰도록 크기·개수 제한) */
 export const PHOTO_MAX_EDGE = 1280; // 긴 변 픽셀 (브라우저에서 줄임)
@@ -135,12 +141,22 @@ export const NAME_COLORS: { id: string; label: string; color: string }[] = [
   { id: "amethyst", label: "자수정", color: "#c084fc" },
   { id: "pearl", label: "진주", color: "#f8fafc" },
 ];
-export const SHOP_PRICE = { flag: 100, color: 150 } as const;
+/** 닉네임 효과: 닉네임 색을 산 선원만 살 수 있다 */
+export const NAME_EFFECTS: { id: string; label: string; desc: string }[] = [
+  { id: "sparkle", label: "✨ 반짝반짝", desc: "이름 위로 별이 반짝여요" },
+  { id: "glow", label: "🔆 후광", desc: "이름이 은은하게 빛나요" },
+  { id: "shimmer", label: "🌊 물결빛", desc: "빛이 이름을 훑고 지나가요" },
+];
+export const SHOP_PRICE = { flag: 100, color: 150, effect: 200 } as const;
 export const BOUNTY_POST = { min: 10, max: 200 };
 export const STASH = { min: 10, max: 200 };
 
 export function colorOf(id: string | null | undefined): string | undefined {
   return NAME_COLORS.find((c) => c.id === id)?.color;
+}
+
+export function isNameEffect(id: unknown): id is string {
+  return typeof id === "string" && NAME_EFFECTS.some((e) => e.id === id);
 }
 
 /* 바다 날씨: 주(월요일 시작, KST)마다 바뀜 */

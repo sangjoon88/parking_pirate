@@ -14,7 +14,7 @@ async function top(query: ReturnType<typeof sql>) {
 /** 이번 달(한국 시간) 해적 랭킹 */
 export const GET = handle(async () => {
   await requireUser();
-  const [gold, discover, scout, regular] = await Promise.all([
+  const [gold, discover, scout, regular, naval] = await Promise.all([
     top(sql`
       select u.id as user_id, u.nickname, sum(l.amount) as score
       from doubloon_logs l join users u on u.id = l.user_id
@@ -36,6 +36,11 @@ export const GET = handle(async () => {
       from parkings p join users u on u.id = p.user_id
       where p.started_at >= ${MONTH_START_KST} and u.status = 'active'
       group by u.id, u.nickname order by score desc, min(p.started_at) asc limit 5`),
+    top(sql`
+      select u.id as user_id, c.name || ' (' || u.nickname || ')' as nickname, count(*) as score
+      from battles b join users u on u.id = b.winner_id join crews c on c.user_id = u.id
+      where b.created_at >= ${MONTH_START_KST} and u.status = 'active'
+      group by u.id, u.nickname, c.name order by score desc, min(b.created_at) asc limit 5`),
   ]);
-  return NextResponse.json({ gold, discover, scout, regular });
+  return NextResponse.json({ gold, discover, scout, regular, naval });
 });
