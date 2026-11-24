@@ -30,7 +30,7 @@ type Detail = {
   reports: SpotReport[];
   photos: SpotPhoto[];
   guards: GuardContact[];
-  me: { id: string; balance: number };
+  me: { id: string; balance: number; canDeleteSpot: boolean };
 };
 type Sub = null | "bounty" | "stash" | "nickname" | "description" | "guard";
 
@@ -93,6 +93,25 @@ export default function SpotSheet({
     setReloadKey((k) => k + 1);
     onChanged(msg);
   };
+
+  async function deleteSpot() {
+    if (!spot) return;
+    const ok = await confirm({
+      title: `${spot.name}을(를) 지울까요?`,
+      message:
+        "이곳의 정박 기록, 항해 일지, 사진, 경비원 메모가 모두 지워져요.\n묻힌 보물과 선원이 건 현상금은 건 사람에게 돌려주고, 발견 보상은 회수해요.\n되돌릴 수 없어요.",
+      confirmLabel: "🗑 정박지 삭제",
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      await api(`/api/spots/${spot.id}`, { method: "DELETE" });
+      onChanged(`🗑 ${spot.name}을(를) 지웠어요`);
+      onClose();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
 
   async function deleteGuard(g: GuardContact) {
     const ok = await confirm({ title: "경비원 메모를 지울까요?", message: `${g.label || "경비원"} · ${g.digits}`, confirmLabel: "지우기", danger: true });
@@ -440,6 +459,14 @@ export default function SpotSheet({
           caption={`${viewing.nickname}의 항해 일지 · ${timeAgo(viewing.createdAt)}`}
           onClose={() => setViewing(null)}
         />
+      )}
+      {detail?.me.canDeleteSpot && (
+        <button
+          onClick={() => void deleteSpot()}
+          className="mt-4 mb-1 flex min-h-11 w-full items-center justify-center gap-1.5 border border-red-500/50 text-sm font-bold text-red-400 active:bg-red-950"
+        >
+          <PxText text="🗑 정박지 삭제" />
+        </button>
       )}
       {confirmNode}
     </Sheet>

@@ -73,6 +73,9 @@ const REASON_LABEL: Record<string, string> = {
   tribute: "휘하 해적단 상납",
   tribute_paid: "상납",
   independence: "독립 전쟁 승리 (상납금 회수)",
+  spot_deleted: "정박지 삭제 (발견 보상 회수)",
+  stash_refund: "정박지 삭제로 묻은 보물 환불",
+  bounty_refund: "정박지 삭제로 현상금 환불",
 };
 
 export default function MeScreen() {
