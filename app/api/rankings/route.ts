@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { handle, requireUser } from "@/lib/auth";
 import { EARNING, MONTH_START_KST } from "@/lib/doubloons";
+import { COUNTED_PARKINGS } from "@/lib/parkingRules";
 
 type Row = { user_id: string; nickname: string; score: string | number };
 
@@ -33,7 +34,7 @@ export const GET = handle(async () => {
       group by u.id, u.nickname order by score desc, min(r.created_at) asc limit 5`),
     top(sql`
       select u.id as user_id, u.nickname, count(*) as score
-      from parkings p join users u on u.id = p.user_id
+      from ${COUNTED_PARKINGS} p join users u on u.id = p.user_id
       where p.started_at >= ${MONTH_START_KST} and u.status = 'active'
       group by u.id, u.nickname order by score desc, min(p.started_at) asc limit 5`),
     top(sql`

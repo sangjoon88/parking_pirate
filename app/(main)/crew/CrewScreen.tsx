@@ -111,7 +111,7 @@ export default function CrewScreen() {
       {duelTarget && (
         <AmountSheet
           title={`⚔️ ${duelTarget.nickname}님에게 결투 신청`}
-          description={`${DUEL_DAYS}일 동안 정박을 더 많이 한 쪽이 판돈 2배를 가져가요. 비기면 돌려받고, 상대가 2일 안에 응답하지 않으면 환불돼요.`}
+          description={`${DUEL_DAYS}일 동안 인정된 정박(3시간 이상 · 하루 3번 · 같은 곳 6시간 간격)을 더 많이 한 쪽이 판돈 2배를 가져가요. 비기면 돌려받고, 상대가 2일 안에 응답하지 않으면 환불돼요.`}
           options={DUEL_STAKES}
           balance={myGold}
           confirmLabel="결투 신청"

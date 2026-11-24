@@ -11,7 +11,15 @@ export const REWARD = {
 } as const;
 
 export const REPORT_COOLDOWN_HOURS = 6;
-export const PARKING_REWARD_COOLDOWN_HOURS = 3;
+/**
+ * 인정된 정박: 보상과 집계(결투·영주·배지·랭킹·전설)는 이 조건을 넘긴 정박만.
+ * 짧게 정박·출항을 반복해 금화를 버는 것을 막는다 (위치 확인 없이).
+ */
+export const PARKING_RULE = {
+  minHours: 3, // 최소 머문 시간 (12시간 자동 종료도 인정)
+  dailyMax: 3, // 하루(한국 날짜) 최대 인정 횟수
+  sameSpotGapHours: 6, // 같은 정박지에 다시 인정받으려면
+} as const;
 export const FLEET_SIZE = 3;
 export const NAVY_ALERT_MINUTES = 30;
 
@@ -101,7 +109,7 @@ export function randomFortune(): string {
 /* ───────── 3차 재미 요소 ───────── */
 
 export const TOLL = 2; // 영주가 받는 통행세 (다른 선원이 정박 금화를 받을 때)
-export const LORD_WINDOW_DAYS = 30; // 최근 30일 정박 횟수로 영주 결정
+export const LORD_WINDOW_DAYS = 30; // 최근 30일 인정된 정박 횟수로 영주 결정
 export const LORD_MIN_PARKINGS = 2;
 export const LEGEND_PARKINGS = 100; // 누적 정박 100회면 전설의 정박지
 export const TREASURE_MIN = 20;

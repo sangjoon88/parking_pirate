@@ -3,16 +3,13 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { parkings, spots } from "@/db/schema";
 import { bad, handle, readJson, requireUser } from "@/lib/auth";
-import { PARKING_MAX_HOURS } from "@/lib/constants";
-import { award, awardedRecently } from "@/lib/doubloons";
-import { boosted, FLEET_SIZE, PARKING_REWARD_COOLDOWN_HOURS, REWARD, TOLL } from "@/lib/game";
-import { lordsBySpot } from "@/lib/lords";
-import { claimStash, claimTreasure } from "@/lib/treasure";
-import { activeParkersAt, closeStaleParkings, getActiveParking } from "@/lib/parking";
+import { PARKING_RULE } from "@/lib/game";
+import { closeStaleParkings, getActiveParking } from "@/lib/parking";
 
 /**
  * 정박 시작. 위치(GPS) 확인은 하지 않는다.
  * 주차하고 사무실 등으로 이동한 뒤에 기록하는 경우가 많아서 운영 결정으로 껐다.
+ * 대신 보상은 출항할 때, 인정된 정박(lib/parkingRules.ts)에만 준다.
  */
 export const POST = handle(async (req: Request) => {
   const user = await requireUser();
@@ -34,50 +31,6 @@ export const POST = handle(async (req: Request) => {
     bad("이미 정박 중이에요.", 409);
   }
 
-  // 정박 보상: 짧은 시간에 반복 정박해서 버는 것 방지
-  let earned = 0;
-  const events: string[] = [];
-  if (!(await awardedRecently(user.id, "parking", PARKING_REWARD_COOLDOWN_HOURS))) {
-    const amount = boosted("parking", REWARD.parking);
-    await award(user.id, amount, "parking", spot.id);
-    earned += amount;
-
-    // 통행세: 영주가 아닌 선원이 정박하면 영주에게 (정박 금화와 같은 쿨다운)
-    const lord = (await lordsBySpot(spot.id)).get(spot.id);
-    if (lord && lord.userId !== user.id) {
-      await award(lord.userId, TOLL, "toll", spot.id);
-      events.push(`🏰 영주 ${lord.nickname}님께 통행세 ${TOLL}두블룬이 갔어요`);
-    }
-  }
-
-  // 오늘의 보물상자
-  const treasure = await claimTreasure(user.id, spot.id);
-  if (treasure > 0) {
-    await award(user.id, treasure, "treasure", spot.id);
-    earned += treasure;
-    events.push(`📦 오늘의 보물상자 발견! +${treasure}`);
-  }
-
-  // 다른 선원이 묻어 둔 보물
-  const stash = await claimStash(user.id, spot.id);
-  if (stash) {
-    await award(user.id, stash.amount, "stash_found", spot.id);
-    earned += stash.amount;
-    events.push(`🪙 ${stash.by}님이 묻어 둔 보물 발견! +${stash.amount}`);
-  }
-
-  // 함대 집결: 3명 이상 모이면 그 자리의 모두에게 (같은 정박지에서 12시간에 한 번)
-  let fleet = false;
-  const parkers = await activeParkersAt(spot.id);
-  if (parkers.length >= FLEET_SIZE) {
-    fleet = true;
-    for (const uid of parkers) {
-      if (!(await awardedRecently(uid, "fleet", PARKING_MAX_HOURS, spot.id))) {
-        await award(uid, REWARD.fleet, "fleet", spot.id);
-        if (uid === user.id) earned += REWARD.fleet;
-      }
-    }
-  }
-
-  return NextResponse.json({ parking: await getActiveParking(user.id), earned, fleet, events }, { status: 201 });
+  // 보상은 출항할 때 정산한다 (인정된 정박만: 3시간 이상 · 하루 3번 · 같은 곳 6시간 간격)
+  return NextResponse.json({ parking: await getActiveParking(user.id), rule: PARKING_RULE }, { status: 201 });
 });

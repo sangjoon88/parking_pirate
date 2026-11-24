@@ -102,3 +102,6 @@ export type FeedItem = {
   photoId: string | null;
   battle: { attacker: string; defender: string; defenderNick: string; attackerWon: boolean; independence: boolean } | null;
 };
+
+/** 출항 정산 결과 (인정된 정박만 보상) */
+export type Settlement = { counted: boolean; reason: string | null; earned: number; fleet: boolean; events: string[] };

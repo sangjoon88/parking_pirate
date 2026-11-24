@@ -5,6 +5,7 @@ import { GUARD_AVG_DAYS, PARKING_MAX_HOURS } from "./constants";
 import { currentKingId, lastMonthKing } from "./doubloons";
 import { boosted, bountyFor, LEGEND_PARKINGS, NAVY_ALERT_MINUTES, weatherFor } from "./game";
 import { lordsBySpot } from "./lords";
+import { COUNTED_PARKINGS } from "./parkingRules";
 import { hasStash, todayTreasure } from "./treasure";
 import type { SpotSummary } from "./types";
 
@@ -61,7 +62,7 @@ export async function listSpots(spotId?: string) {
           from parkings p left join crews c on c.user_id = p.user_id
           where p.spot_id = s.id and p.ended_at is null
             and p.started_at > now() - make_interval(hours => ${PARKING_MAX_HOURS})) as parked_ships,
-        (select count(*)::int from parkings p where p.spot_id = s.id) as total_parkings,
+        (select count(*)::int from ${COUNTED_PARKINGS} p where p.spot_id = s.id) as total_parkings,
         (select round(avg(r.guard_level)::numeric, 1)::float from spot_reports r
           where r.spot_id = s.id and r.guard_level is not null
             and r.created_at > now() - make_interval(days => ${GUARD_AVG_DAYS})) as guard_avg,

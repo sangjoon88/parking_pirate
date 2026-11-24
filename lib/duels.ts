@@ -3,10 +3,11 @@ import { and, desc, eq, lt, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { doubloonLogs, duels } from "@/db/schema";
 import { DUEL_PENDING_DAYS } from "./game";
+import { COUNTED_PARKINGS } from "./parkingRules";
 
 async function parkCount(userId: string, from: Date, to: Date): Promise<number> {
   const res = await db.execute<{ n: string | number }>(sql`
-    select count(*) as n from parkings
+    select count(*) as n from ${COUNTED_PARKINGS} p
     where user_id = ${userId} and started_at >= ${from.toISOString()} and started_at < ${to.toISOString()}`);
   return Number(res.rows[0]?.n ?? 0);
 }

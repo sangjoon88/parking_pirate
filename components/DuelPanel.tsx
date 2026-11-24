@@ -52,7 +52,7 @@ export default function DuelPanel({ onChanged }: { onChanged: (msg: string) => v
     if (action === "accept") {
       const ok = await confirm({
         title: "⚔️ 결투를 받을까요?",
-        message: `${d.challenger}님과 ${DUEL_DAYS}일 동안 정박 횟수 대결.\n판돈 ${d.stake}두블룬을 걸고, 이기면 ${d.stake * 2}두블룬을 가져가요.`,
+        message: `${d.challenger}님과 ${DUEL_DAYS}일 동안 인정된 정박(3시간 이상, 하루 3번) 횟수 대결.\n판돈 ${d.stake}두블룬을 걸고, 이기면 ${d.stake * 2}두블룬을 가져가요.`,
         confirmLabel: "결투 수락",
       });
       if (!ok) return;
@@ -73,7 +73,7 @@ export default function DuelPanel({ onChanged }: { onChanged: (msg: string) => v
     <div className="space-y-2">
       {confirmNode}
       <p className="text-xs text-slate-400">
-        선원 명부에서 상대 옆 <Px name="swords" size="1.15em" />를 눌러 신청해요. {DUEL_DAYS}일 동안 정박을 더 많이 한 쪽이 판돈 2배를 가져가고, 비기면
+        선원 명부에서 상대 옆 <Px name="swords" size="1.15em" />를 눌러 신청해요. {DUEL_DAYS}일 동안 인정된 정박(3시간 이상 · 하루 3번 · 같은 곳 6시간 간격)을 더 많이 한 쪽이 판돈 2배를 가져가고, 비기면
         돌려받아요. 신청 후 2일 안에 응답이 없으면 환불돼요.
       </p>
       {duels.length === 0 && <p className="py-4 text-center text-sm text-slate-500">아직 결투 기록이 없어요.</p>}

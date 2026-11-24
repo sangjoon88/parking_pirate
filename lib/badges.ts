@@ -2,6 +2,7 @@ import "server-only";
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import { BADGES, type BadgeId } from "./game";
+import { COUNTED_PARKINGS } from "./parkingRules";
 
 export type BadgeStatus = { id: BadgeId; icon: string; name: string; desc: string; earned: boolean; progress: string };
 
@@ -15,7 +16,7 @@ export async function badgesFor(
       select
         (select count(*) from spots where created_by = ${userId}) as discoveries,
         (select count(*) from spot_reports where user_id = ${userId}) as reports,
-        (select count(*) from parkings where user_id = ${userId}
+        (select count(*) from ${COUNTED_PARKINGS} cp where user_id = ${userId}
           and (extract(hour from started_at at time zone 'Asia/Seoul') >= 22
             or extract(hour from started_at at time zone 'Asia/Seoul') < 5)) as night,
         (select count(*) from doubloon_logs where user_id = ${userId} and reason = 'new_cell') as cells,
@@ -28,7 +29,7 @@ export async function badgesFor(
     `),
     db.execute<{ d: string }>(sql`
       select distinct to_char(started_at at time zone 'Asia/Seoul', 'YYYY-MM-DD') as d
-      from parkings where user_id = ${userId} order by d
+      from ${COUNTED_PARKINGS} cp where user_id = ${userId} order by d
     `),
   ]);
   const c = Object.fromEntries(Object.entries(countsRes.rows[0] ?? {}).map(([k, v]) => [k, Number(v)]));

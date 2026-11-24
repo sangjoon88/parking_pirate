@@ -6,9 +6,9 @@ import PxText from "./PxText";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { timeAgo } from "@/lib/format";
-import { FLEET_SIZE, randomFortune, RADIO_MAX_LEN, REWARD, WEATHERS, WONDER_NOTE_MAX, type WeatherId } from "@/lib/game";
+import { FLEET_SIZE, PARKING_RULE, randomFortune, RADIO_MAX_LEN, REWARD, WEATHERS, WONDER_NOTE_MAX, type WeatherId } from "@/lib/game";
 import { getPosition, type Kakao, type LatLng } from "@/lib/kakao";
-import type { ActiveParking, RadioMessage, SpotSummary, Wonder } from "@/lib/types";
+import type { ActiveParking, RadioMessage, Settlement, SpotSummary, Wonder } from "@/lib/types";
 import { exploredCells, YEOUIDO_CELLS } from "@/lib/yeouido";
 import { castleSvg, crownSvg, flagSvg, pirateColor, shipMapSvg } from "@/lib/pinHtml";
 import { chestSvg, wonderSvg } from "@/lib/pixelSprites";
@@ -140,19 +140,14 @@ export default function MapScreen({
   );
 
   async function startParking(spot: SpotSummary) {
-    const res = await api<{ parking: ActiveParking; earned: number; fleet: boolean; events: string[] }>(
-      "/api/parkings",
-      { method: "POST", json: { spotId: spot.id } },
-    );
+    const res = await api<{ parking: ActiveParking }>("/api/parkings", { method: "POST", json: { spotId: spot.id } });
     setParking(res.parking);
     setSelectedId(null);
     const lines = [
-      `⚓ ${spot.name}에 정박했어요${res.earned > 0 ? ` +${res.earned}💰` : ""}`,
-      ...(res.fleet ? ["⛵ 함대 집결!"] : []),
-      ...res.events,
+      `⚓ ${spot.name}에 정박했어요`,
+      `${PARKING_RULE.minHours}시간 이상 머물고 출항하면 보상을 받아요`,
       `🔮 ${randomFortune()}`,
     ];
-    if (res.events.length) navigator.vibrate?.(80);
     showToast(lines.join("\n"), 6500);
     void refresh();
   }
@@ -167,9 +162,20 @@ export default function MapScreen({
     if (!ok) return;
     setEnding(true);
     try {
-      await api("/api/parkings/end", { method: "POST" });
+      const res = await api<{ settlement: Settlement | null }>("/api/parkings/end", { method: "POST" });
       setParking(null);
-      showToast("⛵ 출항했어요. 순항하세요!");
+      const st = res.settlement;
+      if (st?.counted) {
+        const lines = [
+          `⛵ 출항! 인정된 정박이에요${st.earned > 0 ? ` +${st.earned}💰` : ""}`,
+          ...(st.fleet ? ["⛵ 함대 집결!"] : []),
+          ...st.events,
+        ];
+        if (st.events.length) navigator.vibrate?.(80);
+        showToast(lines.join("\n"), 6500);
+      } else {
+        showToast(`⛵ 출항했어요. 이번 정박은 보상이 없어요\n${st?.reason ?? ""}`, 5000);
+      }
       void refresh();
     } catch (e) {
       showToast((e as Error).message);
