@@ -9,7 +9,7 @@ import { timeAgo } from "@/lib/format";
 import { FLEET_SIZE, PARKING_RULE, randomFortune, RADIO_MAX_LEN, REWARD, WEATHERS, WONDER_NOTE_MAX, type WeatherId } from "@/lib/game";
 import { getPosition, type Kakao, type LatLng } from "@/lib/kakao";
 import type { ActiveParking, RadioMessage, Settlement, SpotSummary, Wonder } from "@/lib/types";
-import { exploredCells, YEOUIDO_CELLS } from "@/lib/yeouido";
+import { exploredCells, isInYeouido, YEOUIDO_CELLS } from "@/lib/yeouido";
 import { castleSvg, crownSvg, flagSvg, pirateColor, shipMapSvg } from "@/lib/pinHtml";
 import { chestSvg, wonderSvg } from "@/lib/pixelSprites";
 import { useConfirm, useToast } from "./feedback";
@@ -218,7 +218,15 @@ export default function MapScreen({
   /** 메뉴에서 고른 뒤: 위치가 정해져 있으면 바로 입력, 아니면 지도로 위치 고르기 */
   function choose(purpose: Purpose, position: LatLng | null) {
     if (!position) return setMode({ kind: "placing", purpose });
-    if (purpose === "spot") setMode({ kind: "new", position });
+    if (purpose === "spot") {
+      // 서버에서도 막지만, 입력하기 전에 미리 알려 준다
+      if (!isInYeouido(position.lat, position.lng)) {
+        setMode({ kind: "idle" });
+        showToast("☠ 정박지는 여의도 안에서만 등록할 수 있어요");
+        return;
+      }
+      setMode({ kind: "new", position });
+    }
     else if (purpose === "wonder") setMode({ kind: "wonder-new", position });
     else setMode({ kind: "radio", position });
   }

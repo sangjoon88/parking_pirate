@@ -7,7 +7,7 @@ import { award } from "@/lib/doubloons";
 import { DESCRIPTION_MAX, REWARD } from "@/lib/game";
 import { resolveWondersNear } from "@/lib/wonders";
 import { listSpots } from "@/lib/spots";
-import { cellOf } from "@/lib/yeouido";
+import { cellOf, isInYeouido } from "@/lib/yeouido";
 
 export const GET = handle(async () => {
   await requireUser();
@@ -22,6 +22,7 @@ export const POST = handle(async (req: Request) => {
   const { lat, lng } = body;
   if (name.length < 2 || name.length > 40) bad("단지명은 2~40자로 입력해 주세요.");
   if (!isValidCoord(lat, lng)) bad("위치가 올바르지 않아요.");
+  if (!isInYeouido(lat, lng as number)) bad("정박지는 여의도 안에서만 등록할 수 있어요.");
 
   const all = await db.select({ id: spots.id, name: spots.name, lat: spots.lat, lng: spots.lng }).from(spots);
   const near = all

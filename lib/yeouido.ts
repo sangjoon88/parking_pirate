@@ -43,6 +43,33 @@ function inPolygon(lat: number, lng: number): boolean {
   return inside;
 }
 
+/** 여의도 경계 여유 (다각형이 대략적이라 가장자리 정박지가 막히지 않게) */
+export const YEOUIDO_MARGIN_M = 150;
+
+/** 점과 경계선 사이 최단 거리(m). 좁은 지역이라 평면 근사로 충분 */
+function distanceToEdgeM(lat: number, lng: number): number {
+  const kx = 111_320 * Math.cos((lat * Math.PI) / 180);
+  const ky = 110_540;
+  const p = YEOUIDO_POLYGON;
+  let best = Infinity;
+  for (let i = 0, j = p.length - 1; i < p.length; j = i++) {
+    const ax = (p[j][1] - lng) * kx;
+    const ay = (p[j][0] - lat) * ky;
+    const bx = (p[i][1] - lng) * kx;
+    const by = (p[i][0] - lat) * ky;
+    const dx = bx - ax;
+    const dy = by - ay;
+    const t = Math.max(0, Math.min(1, -(ax * dx + ay * dy) / (dx * dx + dy * dy || 1)));
+    best = Math.min(best, Math.hypot(ax + t * dx, ay + t * dy));
+  }
+  return best;
+}
+
+/** 여의도 안인지 (경계에서 150m 바깥까지는 여의도로 본다). 정박지 등록 제한에 쓴다 */
+export function isInYeouido(lat: number, lng: number): boolean {
+  return inPolygon(lat, lng) || distanceToEdgeM(lat, lng) <= YEOUIDO_MARGIN_M;
+}
+
 function cellKey(row: number, col: number) {
   return `${row}:${col}`;
 }
