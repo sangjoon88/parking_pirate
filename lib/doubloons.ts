@@ -43,6 +43,25 @@ export async function spend<T>(
 /** 이번 달 시작 시각 (한국 시간 기준) */
 export const MONTH_START_KST = sql`(date_trunc('month', now() at time zone 'Asia/Seoul') at time zone 'Asia/Seoul')`;
 
+/**
+ * 선원끼리 오간 금화와 환불: 새로 번 금화가 아니다.
+ * 추천인 몫·상납을 붙이지 않고, 랭킹·해적왕("번 금화")에서도 뺀다.
+ * (짜고 주고받거나 내가 건 현상금을 내가 가져가서 금화·랭킹을 불리는 것 방지)
+ */
+export const NOT_EARNED_REASONS = [
+  "duel_refund",
+  "duel_win", // 판돈은 선원끼리 오간 돈
+  "independence",
+  "stash_found", // 다른 선원이 묻은 금화
+  "stash_refund",
+  "bounty_posted", // 선원이 건 현상금
+  "bounty_refund",
+] as const satisfies readonly Reason[];
+const NOT_EARNED = new Set<Reason>(NOT_EARNED_REASONS);
+
+/** 이미 준 보상을 되돌리는 기록(음수). "번 금화"에서도 빼야 등록·삭제 반복으로 랭킹이 오르지 않는다 */
+export const CLAWBACK_REASONS = ["spot_deleted", "tribute_revoked"] as const satisfies readonly Reason[];
+
 /** 휘하 해적단이 상납하는 수입 (활동으로 번 금화만) */
 const TRIBUTE_REASONS = new Set<Reason>([
   "discovery",
@@ -53,7 +72,6 @@ const TRIBUTE_REASONS = new Set<Reason>([
   "fleet",
   "toll",
   "treasure",
-  "stash_found",
   "wonder_solved",
 ]);
 
@@ -79,51 +97,71 @@ async function payTribute(userId: string, amount: number) {
   ]);
 }
 
-/** 금화 지급. 양수 지급이면 추천인에게 10%가 따라가고, 휘하 해적단이면 상납한다. */
-export async function award(userId: string, amount: number, reason: Reason, refId?: string | null) {
-  if (!amount) return;
-  await db.insert(doubloonLogs).values({ userId, amount, reason, refId: refId ?? null });
-  if (amount > 0 && TRIBUTE_REASONS.has(reason)) await payTribute(userId, amount);
-  if (amount > 0 && reason !== "lineage" && reason !== "lineage_ban") {
-    const [me] = await db
-      .select({ referrerId: users.referrerId, status: users.status })
-      .from(users)
-      .where(eq(users.id, userId))
-      .limit(1);
-    if (me?.referrerId) {
-      const [ref] = await db.select({ status: users.status }).from(users).where(eq(users.id, me.referrerId)).limit(1);
-      if (ref?.status === "active") {
-        await db
-          .insert(doubloonLogs)
-          .values({ userId: me.referrerId, amount: lineageShare(amount), reason: "lineage", refId: userId });
-      }
+/** 새로 번 금화에 따라붙는 것: 휘하면 상납, 추천인에게 10% */
+async function afterEarned(userId: string, amount: number, reason: Reason) {
+  if (amount <= 0 || NOT_EARNED.has(reason) || reason === "lineage" || reason === "lineage_ban") return;
+  if (TRIBUTE_REASONS.has(reason)) await payTribute(userId, amount);
+  const [me] = await db
+    .select({ referrerId: users.referrerId, status: users.status })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  if (me?.referrerId) {
+    const [ref] = await db.select({ status: users.status }).from(users).where(eq(users.id, me.referrerId)).limit(1);
+    if (ref?.status === "active") {
+      await db
+        .insert(doubloonLogs)
+        .values({ userId: me.referrerId, amount: lineageShare(amount), reason: "lineage", refId: userId });
     }
   }
 }
 
-/** 최근 hours 시간 안에 같은 사유(+같은 대상)로 받은 적이 있는지 */
-export async function awardedRecently(userId: string, reason: Reason, hours: number, refId?: string) {
-  const since = new Date(Date.now() - hours * 3600_000);
-  const [row] = await db
-    .select({ id: doubloonLogs.id })
-    .from(doubloonLogs)
-    .where(
-      and(
-        eq(doubloonLogs.userId, userId),
-        eq(doubloonLogs.reason, reason),
-        gt(doubloonLogs.createdAt, since),
-        refId ? eq(doubloonLogs.refId, refId) : undefined,
-      ),
-    )
-    .limit(1);
-  return !!row;
+/** 금화 지급. 새로 번 금화면 추천인에게 10%가 따라가고, 휘하 해적단이면 상납한다. */
+export async function award(userId: string, amount: number, reason: Reason, refId?: string | null) {
+  if (!amount) return;
+  await db.insert(doubloonLogs).values({ userId, amount, reason, refId: refId ?? null });
+  await afterEarned(userId, amount, reason);
+}
+
+/** 트랜잭션 안에서 장부에 먼저 기록한 금화의 후속 처리(상납·추천인 몫). 커밋한 뒤에 부른다 */
+export const settleEarned = afterEarned;
+
+/**
+ * 쿨다운이 있는 보상: 최근 hours 시간 안에 같은 사유·같은 대상으로 받은 적이 없을 때만 지급.
+ * 확인과 기록을 잠금 안에서 해서, 동시에 여러 번 요청해도 한 번만 받는다. 지급했으면 true
+ */
+export async function awardOnce(userId: string, amount: number, reason: Reason, refId: string, hours: number) {
+  if (!amount) return false;
+  const given = await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`award:${userId}:${reason}:${refId}`}))`);
+    const [row] = await tx
+      .select({ id: doubloonLogs.id })
+      .from(doubloonLogs)
+      .where(
+        and(
+          eq(doubloonLogs.userId, userId),
+          eq(doubloonLogs.reason, reason),
+          eq(doubloonLogs.refId, refId),
+          gt(doubloonLogs.createdAt, new Date(Date.now() - hours * 3600_000)),
+        ),
+      )
+      .limit(1);
+    if (row) return false;
+    await tx.insert(doubloonLogs).values({ userId, amount, reason, refId });
+    return true;
+  });
+  if (given) await afterEarned(userId, amount, reason);
+  return given;
 }
 
 /**
- * "번 금화"로 치는 기록: 양수이면서 환불이 아닌 것.
+ * "번 금화"로 치는 기록: 양수이면서 선원끼리 오간 돈·환불이 아닌 것 + 보상 회수(음수).
  * 상점·현상금·보물에 쓴 금화 때문에 랭킹이 떨어지지 않도록 지출은 빼고 센다.
  */
-export const EARNING = sql.raw(`(l.amount > 0 and l.reason not in ('duel_refund', 'independence'))`);
+const list = (xs: readonly string[]) => xs.map((x) => `'${x}'`).join(", ");
+export const EARNING = sql.raw(
+  `((l.amount > 0 and l.reason not in (${list(NOT_EARNED_REASONS)})) or l.reason in (${list(CLAWBACK_REASONS)}))`,
+);
 
 /** 이달의 해적왕: 이번 달 번 금화 1위 (활동 선원, 1개 이상) */
 export async function currentKingId(): Promise<string | null> {
@@ -132,6 +170,7 @@ export async function currentKingId(): Promise<string | null> {
     from doubloon_logs l join users u on u.id = l.user_id
     where l.created_at >= ${MONTH_START_KST} and u.status = 'active' and ${EARNING}
     group by l.user_id
+    having sum(l.amount) > 0
     order by sum(l.amount) desc, min(l.created_at) asc
     limit 1
   `);
@@ -152,6 +191,7 @@ export async function lastMonthKing(): Promise<{ userId: string; nickname: strin
     where l.created_at >= ${LAST_MONTH_START_KST} and l.created_at < ${MONTH_START_KST}
       and u.status = 'active' and ${EARNING}
     group by l.user_id, u.nickname
+    having sum(l.amount) > 0
     order by sum(l.amount) desc, min(l.created_at) asc
     limit 1
   `);

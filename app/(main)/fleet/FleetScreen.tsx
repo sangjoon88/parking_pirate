@@ -67,7 +67,7 @@ export default function FleetScreen() {
     const ok = await confirm({
       title: r.attack.independence ? `🗽 ${r.name}에 독립 전쟁!` : `⚔️ ${r.name}을(를) 공격할까요?`,
       message: r.attack.independence
-        ? "이기면 바로 독립하고 그동안 낸 상납금을 돌려받아요. 지면 그대로 휘하예요."
+        ? "이기면 바로 독립하고 그동안 낸 상납금을 돌려받아요. 지면 그대로 휘하예요. 독립 전쟁은 하루 한 번이에요."
         : `이기면 ${NAVAL.vassalDays}일간 휘하로 삼아 상납을 받아요. 지면 상대가 방어 보상을 받아요.\n장비는 싸우면서 일부 부서질 수 있어요. 공격하면 내 보호 기간은 끝나요.`,
       confirmLabel: r.attack.independence ? "독립 전쟁" : "포격 개시",
       danger: true,
@@ -503,7 +503,7 @@ function Rules() {
         <li>· 배 체력·공격·방어로 서로 한 발씩 쏘는 자동 포격전이에요. 운(명중·치명타)도 있어요.</li>
         <li>· 공격해서 이기면 상대가 {NAVAL.vassalDays}일간 휘하가 되어, 활동으로 버는 금화의 {NAVAL.tributeRate}%를 상납해요 (휘하 1회 최대 {NAVAL.tributeCap}).</li>
         <li>· 내 전투력의 절반도 안 되는 상대를 이기면 상납 {NAVAL.tributeRateBully}%·전리품 {NAVAL.lootBully}, 1.5배 강한 상대를 이기면 상납 {NAVAL.tributeRateUnderdog}%·전리품 {NAVAL.lootUnderdog}.</li>
-        <li>· 휘하는 언제든 주인에게 <Px name="chainbreak" size="1.15em" /> 독립 전쟁을 걸 수 있어요. 이기면 바로 독립하고 낸 상납금을 돌려받아요.</li>
+        <li>· 휘하는 언제든 주인에게 <Px name="chainbreak" size="1.15em" /> 독립 전쟁을 걸 수 있어요(하루 한 번). 이기면 바로 독립하고 낸 상납금을 주인에게서 돌려받아요.</li>
         <li>· 휘하인 동안, 풀린 뒤 {NAVAL.freedProtectDays}일, 창단 후 {NAVAL.newCrewProtectDays}일은 다른 해적단이 공격할 수 없어요.</li>
         <li>· 체력이 {NAVAL.minAttackHpPct}% 미만이면 공격할 수 없어요. 시간이 지나면 회복되고, 금화로 바로 수리할 수도 있어요.</li>
         <li>· 해전은 정박 결투(내 정보 탭)와 별개예요. 정박 결투는 정박 횟수, 해전은 함선 실력으로 겨뤄요.</li>

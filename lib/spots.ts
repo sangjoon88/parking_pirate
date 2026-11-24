@@ -8,6 +8,7 @@ import { lordsBySpot } from "./lords";
 import { COUNTED_PARKINGS } from "./parkingRules";
 import { hasStash, todayTreasure } from "./treasure";
 import type { SpotSummary } from "./types";
+import { navyAlertReporterParked } from "./reports";
 
 type Row = {
   id: string;
@@ -74,6 +75,7 @@ export async function listSpots(spotId?: string) {
         select r.created_at, ru.nickname from spot_reports r join users ru on ru.id = r.user_id
         where r.spot_id = s.id and r.guard_level = 5
           and r.created_at > now() - make_interval(mins => ${NAVY_ALERT_MINUTES})
+          and ${navyAlertReporterParked({ userId: sql.raw("r.user_id"), spotId: sql.raw("r.spot_id"), createdAt: sql.raw("r.created_at") })}
         order by r.created_at desc limit 1
       ) alert on true
       ${where}

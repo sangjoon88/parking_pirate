@@ -30,7 +30,7 @@ type Detail = {
   reports: SpotReport[];
   photos: SpotPhoto[];
   guards: GuardContact[];
-  me: { id: string; balance: number; canDeleteSpot: boolean };
+  me: { id: string; balance: number; canDeleteSpot: boolean; isAdmin: boolean };
 };
 type Sub = null | "bounty" | "stash" | "nickname" | "description" | "guard";
 
@@ -108,6 +108,22 @@ export default function SpotSheet({
       await api(`/api/spots/${spot.id}`, { method: "DELETE" });
       onChanged(`🗑 ${spot.name}을(를) 지웠어요`);
       onClose();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
+  async function reopenSpot() {
+    if (!spot) return;
+    const ok = await confirm({
+      title: `${spot.name}을(를) 다시 열까요?`,
+      message: "차단기가 없어진 게 확인됐을 때만 열어 주세요.\n이전 \"차단기 생김\" 제보는 더 이상 세지 않아요.",
+      confirmLabel: "🔓 다시 열기",
+    });
+    if (!ok) return;
+    try {
+      await api(`/api/spots/${spot.id}`, { method: "PATCH", json: { status: "open" } });
+      changed(`🔓 ${spot.name}을(를) 다시 열었어요`);
     } catch (e) {
       setError((e as Error).message);
     }
@@ -459,6 +475,14 @@ export default function SpotSheet({
           caption={`${viewing.nickname}의 항해 일지 · ${timeAgo(viewing.createdAt)}`}
           onClose={() => setViewing(null)}
         />
+      )}
+      {detail?.me.isAdmin && spot?.status === "closed" && (
+        <button
+          onClick={() => void reopenSpot()}
+          className="mt-4 flex min-h-11 w-full items-center justify-center gap-1.5 border border-sea-600 text-sm font-bold active:bg-sea-800"
+        >
+          <PxText text="🔓 정박지 다시 열기 (관리자)" />
+        </button>
       )}
       {detail?.me.canDeleteSpot && (
         <button

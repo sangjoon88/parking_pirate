@@ -21,6 +21,7 @@ export const GET = handle(async () => {
       from doubloon_logs l join users u on u.id = l.user_id
       where l.created_at >= ${MONTH_START_KST} and u.status = 'active' and ${EARNING}
       group by u.id, u.nickname
+      having sum(l.amount) > 0
       order by score desc, min(l.created_at) asc limit 5`),
     top(sql`
       select u.id as user_id, u.nickname, count(*) as score

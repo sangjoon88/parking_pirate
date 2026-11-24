@@ -2,6 +2,8 @@ import "server-only";
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import { HttpError } from "./errors";
+import { lineageShare } from "./game";
+import { cellOf } from "./yeouido";
 
 /**
  * 정박지 삭제 권한.
@@ -39,16 +41,21 @@ export type SpotDeleteResult = {
 /**
  * 정박지와 딸린 기록을 한 트랜잭션에서 지운다.
  * - 묻힌 보물(아직 안 찾은 것)과 선원이 건 현상금은 건 사람에게 돌려준다
- * - 발견 보상(발견·새 해역)은 발견자에게서 회수한다 (등록·삭제 반복으로 금화 버는 것 방지)
+ * - 발견 보상(발견·새 해역)과 이곳으로 해결된 궁금한 곳 보상, 그 추천인 몫까지 회수한다 (등록·삭제 반복으로 금화 버는 것 방지)
  * - 정박·일지·사진·경비원 메모·오늘의 보물상자는 지우고, 이곳으로 해결된 궁금한 곳은 다시 미해결로
  * 금화 장부는 지우지 않고 기록을 더한다(지난 기록은 그대로).
  */
 export async function deleteSpot(spotId: string): Promise<SpotDeleteResult> {
   return db.transaction(async (tx) => {
     const n = async (q: ReturnType<typeof sql>) => (await tx.execute(q)).rowCount ?? 0;
-    const spotRes = await tx.execute<{ name: string; created_by: string; posted_bounty: number }>(
-      sql`select name, created_by, posted_bounty from spots where id = ${spotId} for update`,
-    );
+    const spotRes = await tx.execute<{
+      name: string;
+      created_by: string;
+      posted_bounty: number;
+      lat: number;
+      lng: number;
+      created_at: Date | string;
+    }>(sql`select name, created_by, posted_bounty, lat, lng, created_at from spots where id = ${spotId} for update`);
     const spot = spotRes.rows[0];
     if (!spot) throw new HttpError(404, "이미 지워진 정박지예요.");
 
@@ -70,7 +77,7 @@ export async function deleteSpot(spotId: string): Promise<SpotDeleteResult> {
       const posts = await tx.execute<{ user_id: string; amount: string | number }>(sql`
         select user_id, -sum(amount) as amount from doubloon_logs
         where reason = 'bounty_post' and ref_id = ${spotId}
-          and created_at > coalesce((select max(created_at) from doubloon_logs where reason = 'bounty' and ref_id = ${spotId}), 'epoch')
+          and created_at > coalesce((select max(created_at) from doubloon_logs where reason in ('bounty', 'bounty_posted') and ref_id = ${spotId}), 'epoch')
         group by user_id
       `);
       for (const p of posts.rows) {
@@ -84,16 +91,35 @@ export async function deleteSpot(spotId: string): Promise<SpotDeleteResult> {
       }
     }
 
-    // 발견 보상 회수
-    const rewardRes = await tx.execute<{ total: string | number }>(sql`
-      select coalesce(sum(amount), 0) as total from doubloon_logs
-      where user_id = ${spot.created_by} and ref_id = ${spotId} and reason in ('discovery', 'new_cell')
+    // 보상 회수 (등록·삭제 반복으로 금화·랭킹·추천인 몫을 버는 것 방지)
+    // - 발견·새 해역(발견자), 이곳으로 해결된 궁금한 곳 보상(찍은 선원)
+    // - 그 보상에 따라간 추천인 몫
+    // 새 해역 보상은 예전에는 해역 id로 기록했다: 발견자가 등록 시각 앞뒤 1분 안에 받은 그 해역 보상으로 찾는다
+    const cell = cellOf(Number(spot.lat), Number(spot.lng));
+    const createdAt = new Date(spot.created_at).toISOString();
+    const rewardRes = await tx.execute<{ user_id: string; amount: number; referrer_id: string | null }>(sql`
+      select l.user_id, l.amount, u.referrer_id
+      from doubloon_logs l join users u on u.id = l.user_id
+      where l.amount > 0 and (
+        (l.ref_id = ${spotId} and l.reason in ('discovery', 'new_cell', 'wonder_solved'))
+        or (l.reason = 'new_cell' and l.ref_id = ${cell ?? ""} and l.user_id = ${spot.created_by}
+          and l.created_at between ${createdAt}::timestamptz - interval '1 minute'
+                               and ${createdAt}::timestamptz + interval '1 minute')
+      )
     `);
-    const revoked = Number(rewardRes.rows[0]?.total ?? 0);
-    if (revoked > 0) {
-      await tx.execute(
-        sql`insert into doubloon_logs (user_id, amount, reason, ref_id) values (${spot.created_by}, ${-revoked}, 'spot_deleted', ${spotId})`,
-      );
+    const back = new Map<string, number>();
+    const take = (userId: string, amount: number) => back.set(userId, (back.get(userId) ?? 0) + amount);
+    for (const r of rewardRes.rows) {
+      take(r.user_id, Number(r.amount));
+      if (r.referrer_id) take(r.referrer_id, lineageShare(Number(r.amount)));
+    }
+    const revoked = back.get(spot.created_by) ?? 0;
+    for (const [userId, amount] of back) {
+      if (amount > 0) {
+        await tx.execute(
+          sql`insert into doubloon_logs (user_id, amount, reason, ref_id) values (${userId}, ${-amount}, 'spot_deleted', ${spotId})`,
+        );
+      }
     }
 
     const photos = await n(

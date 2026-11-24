@@ -87,6 +87,8 @@ export const NAVAL = {
   freedProtectDays: 3,
   /** 공격 제한 */
   raidsPerDay: 1,
+  /** 독립 전쟁도 하루 한 번 (연타로 주인 장비를 부수거나 체력을 묶어 두는 것 방지) */
+  warsPerDay: 1,
   sameTargetDays: 7,
   /** 장비 파손 확률 (%) */
   breakWinner: 25,

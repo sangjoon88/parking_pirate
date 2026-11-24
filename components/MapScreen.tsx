@@ -752,7 +752,7 @@ function LegendSheet({ onClose }: { onClose: () => void }) {
     [svg(castleSvg(2.4)), "깃대 위 성: 영주", "최근 30일 이곳에 가장 많이 정박한 선원이 있어요. 누군지는 깃발을 눌러 확인"],
     [svg(crownSvg(3)), "깃대 위 왕관: 해적왕의 영지", "지난달 해적왕이 영주인 곳 (이번 달 내내)"],
     [<span key="d" className={`${tagCls} bg-green-600 text-white`}><Px name="coin" size="1.15em" />35</span>, "현상금", "'차단기 그대로 없음' 일지를 쓰면 획득"],
-    [<span key="e" className={`${tagCls} bg-red-600 text-white`}><Px name="warn" size="1.15em" /></span>, "해군 출몰", "30분 안에 경계 5 제보"],
+    [<span key="e" className={`${tagCls} bg-red-600 text-white`}><Px name="warn" size="1.15em" /></span>, "해군 출몰", "30분 안에 정박 중인 선원의 경계 5 제보"],
     [svg(chestSvg(3)), "오늘의 보물상자", "오늘 처음 정박하는 선원이 획득"],
     [svg(wonderSvg(2, false)), "궁금한 곳", "누가 확인해 주길 기다리는 곳"],
   ];

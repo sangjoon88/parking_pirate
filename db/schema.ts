@@ -155,6 +155,8 @@ export const doubloonLogs = pgTable(
         "spot_deleted",
         "stash_refund",
         "bounty_refund",
+        "bounty_posted",
+        "tribute_revoked",
       ],
     }).notNull(),
     refId: text("ref_id"),

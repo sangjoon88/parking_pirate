@@ -61,7 +61,7 @@ export async function fleetState(userId: string): Promise<FleetState> {
     .filter((c) => c.userId !== userId && c.userStatus === "active")
     .map((c: CrewFull) => {
       const lordId = activeOverlord(c, now);
-      const check = mine ? canAttack(mine, c, { raidsToday: raids, recentTargets: targets }, now) : { ok: false as const, reason: "해적단 창단 필요" };
+      const check = mine ? canAttack(mine, c, { raidsToday: raids.raids, warsToday: raids.wars, recentTargets: targets }, now) : { ok: false as const, reason: "해적단 창단 필요" };
       return {
         userId: c.userId,
         name: c.name,
@@ -83,5 +83,5 @@ export async function fleetState(userId: string): Promise<FleetState> {
     .sort((a, b) => Number(b.attack.ok) - Number(a.attack.ok) || b.power - a.power);
 
   const battles: BattleView[] = battleRes.rows.map((b) => ({ id: b.id, createdAt: new Date(b.created_at).toISOString(), log: b.log }));
-  return { me: { id: userId, balance }, crew, rivals, battles, raidsLeft: Math.max(0, NAVAL.raidsPerDay - raids) };
+  return { me: { id: userId, balance }, crew, rivals, battles, raidsLeft: Math.max(0, NAVAL.raidsPerDay - raids.raids) };
 }

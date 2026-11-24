@@ -65,7 +65,7 @@ export const POST = handle(async (req: Request) => {
     const foe = loaded.get(targetId);
     if (!me) throw new HttpError(400, "해적단을 먼저 만들어 주세요.");
     if (!foe) throw new HttpError(404, "상대 해적단을 찾을 수 없어요.");
-    const check = canAttack(me, foe, { raidsToday: raids, recentTargets: targets });
+    const check = canAttack(me, foe, { raidsToday: raids.raids, warsToday: raids.wars, recentTargets: targets });
     if (!check.ok) throw new HttpError(400, `공격할 수 없어요: ${check.reason}`);
     const independence = check.independence;
 
@@ -168,8 +168,14 @@ export const POST = handle(async (req: Request) => {
   const { log, battleId } = result;
   if (log.loot) await award(user.id, log.loot, "naval_loot", battleId);
   if (log.defense) await award(targetId, log.defense, "naval_defense", battleId);
-  // 회수한 상납금은 새로 번 돈이 아니므로 추천인 몫·상납 없이 바로 기록
-  if (log.refund) await db.insert(doubloonLogs).values({ userId: user.id, amount: log.refund, reason: "independence", refId: battleId });
+  // 상납금 회수: 휘하는 돌려받고 주인은 받았던 만큼 내놓는다 (금화가 두 번 생기지 않게).
+  // 새로 번 돈이 아니므로 추천인 몫·상납 없이 바로 기록
+  if (log.refund) {
+    await db.insert(doubloonLogs).values([
+      { userId: user.id, amount: log.refund, reason: "independence", refId: battleId },
+      { userId: targetId, amount: -log.refund, reason: "tribute_revoked", refId: battleId },
+    ]);
+  }
 
   return NextResponse.json({ battle: { id: battleId, createdAt: new Date().toISOString(), log }, state: await fleetState(user.id) });
 });

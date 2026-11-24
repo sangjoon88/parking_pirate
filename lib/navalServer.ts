@@ -103,14 +103,15 @@ export function protectedUntil(c: CrewRow, now = Date.now()): Date | null {
   return candidates.length ? new Date(Math.max(...candidates)) : null;
 }
 
-/** 오늘(한국 날짜) 이미 일반 공격을 했는지 */
-export async function raidsToday(exec: Exec, userId: string): Promise<number> {
-  const res = await exec.execute<{ n: string | number }>(sql`
-    select count(*) as n from battles
-    where attacker_id = ${userId} and independence = false
+/** 오늘(한국 날짜) 한 일반 공격·독립 전쟁 횟수 */
+export async function raidsToday(exec: Exec, userId: string): Promise<{ raids: number; wars: number }> {
+  const res = await exec.execute<{ raids: string | number; wars: string | number }>(sql`
+    select count(*) filter (where independence = false) as raids, count(*) filter (where independence) as wars
+    from battles
+    where attacker_id = ${userId}
       and created_at >= (date_trunc('day', now() at time zone 'Asia/Seoul') at time zone 'Asia/Seoul')
   `);
-  return Number(res.rows[0]?.n ?? 0);
+  return { raids: Number(res.rows[0]?.raids ?? 0), wars: Number(res.rows[0]?.wars ?? 0) };
 }
 
 /** 최근 며칠 안에 내가 공격한 상대 id */
@@ -129,7 +130,7 @@ export type AttackCheck = { ok: true; independence: boolean } | { ok: false; rea
 export function canAttack(
   me: CrewFull,
   target: CrewFull,
-  ctx: { raidsToday: number; recentTargets: Set<string> },
+  ctx: { raidsToday: number; warsToday: number; recentTargets: Set<string> },
   now = Date.now(),
 ): AttackCheck {
   if (me.userId === target.userId) return { ok: false, reason: "우리 해적단" };
@@ -137,7 +138,10 @@ export function canAttack(
   const myLord = activeOverlord(me, now);
   const independence = myLord === target.userId;
   if (me.hpNow < (me.stats.maxHp * NAVAL.minAttackHpPct) / 100) return { ok: false, reason: "우리 배 수리 필요" };
-  if (independence) return { ok: true, independence: true };
+  if (independence) {
+    if (ctx.warsToday >= NAVAL.warsPerDay) return { ok: false, reason: "오늘 독립 전쟁 완료" };
+    return { ok: true, independence: true };
+  }
   if (myLord) return { ok: false, reason: "휘하라 독립 전쟁만 가능" };
   if (activeOverlord(target, now) === me.userId) return { ok: false, reason: "이미 우리 휘하" };
   if (activeOverlord(target, now)) return { ok: false, reason: "다른 해적단 휘하" };

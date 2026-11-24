@@ -116,7 +116,7 @@ export default function ReportSheet({
           })}
         </div>
         {!editing && guardLevel === 5 && (
-          <p className="mt-2 text-xs font-bold text-red-400"><Px name="warn" size="1.15em" /> 이 정박지에 정박 중인 선원들에게 해군 출몰 경보가 30분간 뜹니다</p>
+          <p className="mt-2 text-xs font-bold text-red-400"><Px name="warn" size="1.15em" /> 지금 이 정박지에 정박 중이면, 정박 중인 선원들에게 해군 출몰 경보가 30분간 뜹니다</p>
         )}
       </section>
 

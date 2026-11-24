@@ -3,10 +3,11 @@ import { and, desc, eq, gt, isNull, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { parkings, spotReports, spots, users } from "@/db/schema";
 import { PARKING_MAX_HOURS } from "./constants";
-import { award, awardedRecently } from "./doubloons";
+import { award, awardOnce } from "./doubloons";
 import { boosted, FLEET_SIZE, NAVY_ALERT_MINUTES, REWARD, TOLL } from "./game";
 import { lordsBySpot } from "./lords";
 import { COUNTED_PARKINGS, parkingVerdict } from "./parkingRules";
+import { navyAlertReporterParked } from "./reports";
 import { claimStash, claimTreasure } from "./treasure";
 
 const cutoff = () => new Date(Date.now() - PARKING_MAX_HOURS * 3600_000);
@@ -78,10 +79,7 @@ export async function settleParking(p: { id: string; userId: string; spotId: str
   `);
   if (Number(res.rows[0]?.n ?? 0) >= FLEET_SIZE - 1) {
     out.fleet = true;
-    if (!(await awardedRecently(p.userId, "fleet", PARKING_MAX_HOURS, p.spotId))) {
-      await award(p.userId, REWARD.fleet, "fleet", p.spotId);
-      out.earned += REWARD.fleet;
-    }
+    if (await awardOnce(p.userId, REWARD.fleet, "fleet", p.spotId, PARKING_MAX_HOURS)) out.earned += REWARD.fleet;
   }
   return out;
 }
@@ -110,6 +108,7 @@ export async function getActiveParking(userId: string) {
         eq(spotReports.spotId, row.spotId),
         eq(spotReports.guardLevel, 5),
         gt(spotReports.createdAt, new Date(Date.now() - NAVY_ALERT_MINUTES * 60_000)),
+        navyAlertReporterParked(spotReports),
       ),
     )
     .orderBy(desc(spotReports.createdAt))
