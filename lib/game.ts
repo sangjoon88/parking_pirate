@@ -123,9 +123,6 @@ export const PHOTO_TOTAL_MAX_BYTES = 400 * 1024 * 1024; // 전체 사진 용량 
 export const DUEL_DAYS = 7;
 export const DUEL_PENDING_DAYS = 2;
 export const DUEL_STAKES = [20, 50, 100, 200] as const;
-/** 결투 핸디캡: 이 닉네임의 선원과 결투하면 상대 점수(정박 횟수)에 +1 */
-export const DUEL_HANDICAP_NICKNAMES = ["여의도웸비"];
-export const DUEL_HANDICAP_BONUS = 1;
 
 /** 승선 기념일 보상 */
 export const ANNIVERSARIES: { days: number; label: string; reward: number }[] = [
