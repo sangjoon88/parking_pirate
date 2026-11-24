@@ -878,24 +878,34 @@ export const PX_ICONS = {
   ],
 } satisfies Record<string, string[]>;
 
-/** NPC 선원: 귀여운 도트 사람 (12x14) */
-const FACE = [
-  "..KSSSSSSK..",
-  ".KSSSSSSSSK.",
-  ".KSKSSSSKSK.",
-  ".KHSSrrSSHK.",
-  "..KSSSSSSK..",
-  "...KKKKKK...",
-];
+/** NPC 선원: 귀여운 도트 사람 (12x14). 얼굴 오른쪽에 그늘, 직업마다 얼굴 특징 */
+type Look = "plain" | "mustache" | "beard" | "glasses";
+function face(look: Look = "plain") {
+  const eyes = look === "glasses" ? ".KbKbSSbKbK." : ".KSKSSSSKsK.";
+  const mouth = look === "mustache" ? ".KHnnnnnnHK." : ".KHSSrrSSHK.";
+  const chin = look === "beard" ? "..KnnrrnnK.." : "..KSSSSSsK..";
+  return ["..KSSSSSSK..", ".KSSSSSSSsK.", eyes, mouth, chin, "...KKKKKK..."];
+}
+const FACE = face();
 function body(c: string, extra = c) {
   return [`..K${c}${c}${extra}${extra}${c}${c}K..`, `.KS${c}${c}${extra}${extra}${c}${c}SK.`, `..K${c}${c}${c}${c}${c}${c}K..`, "...KK..KK..."];
 }
 
 export const PX_NPCS = {
-  cook: ["...WWWWWW...", "..WWWWWWWW..", "...WWWWWW...", "..KwwwwwwK..", ...FACE, ...body("W", "w")],
-  doctor: ["............", "...KKKKKK...", "..KWWRRWWK..", "..KWRRRRWK..", ...FACE, ...body("W", "R")],
-  carpenter: ["............", "....KKKK....", "...KYYYYK...", ".KKYYYYYYKK.", ...FACE, ...body("O", "n")],
-  navigator: ["............", "..KKKKKKKK..", ".KbbbYYbbbK.", "KKKKKKKKKKKK", ...FACE, ...body("b", "Y")],
+  cook: ["...WWWWWW...", "..WWWWWWWW..", "...WWWWWW...", "..KwwwwwwK..", ...face("mustache"), ...body("W", "w")],
+  doctor: ["............", "...KKKKKK...", "..KWWRRWWK..", "..KWRRRRWK..", ...face("glasses"), ...body("W", "R")],
+  carpenter: ["............", "....KKKK....", "...KYYYYK...", ".KKYYYYYYKK.", ...face("beard"), ...body("O", "n")],
+  navigator: [
+    "............",
+    "..KKKKKKKK..",
+    ".KbbbYYbbbK.",
+    "KKKKKKKKKKKK",
+    ...FACE,
+    "..KbbYYbbK..",
+    ".KYbbYYbbYK.",
+    "..KbbbbbbK..",
+    "...KK..KK...",
+  ],
   lookout: ["............", "............", "...KKKKKK...", "..KRRRRRRKRR", ...FACE, ...body("E", "W")],
   gunner: [
     "............",

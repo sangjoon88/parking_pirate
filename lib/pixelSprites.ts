@@ -157,3 +157,23 @@ export function compassSvg(scale: number): string {
     scale,
   );
 }
+
+/** 한강 괴물 (24x10): 옛 해도 가장자리의 바다뱀 장식. 머리는 오른쪽 */
+export function seaMonsterSvg(scale: number): string {
+  return spriteSvg(
+    [
+      "..................KKK...",
+      ".................KEEEK..",
+      "................KEEWKEK.",
+      "................KEEEEERR",
+      "....KKK.....KKK.KEeEK...",
+      "...KEEEK...KEEEKKEeK....",
+      "..KEeeeEK.KEeeeEKEeK....",
+      "..KEe.eEK.KEe.eEKEeK....",
+      "CCBBBBBBBBBBBBBBBBBBBCC.",
+      ".bbb..bbbbb..bbbbbb..b..",
+    ],
+    { K: "#2b1d0e", E: "#4d7c5a", e: "#2f5a3e", W: "#f5c451", R: "#dc2626", B: "#3b6e8f", b: "#2a5470", C: "#e2e8f0" },
+    scale,
+  );
+}

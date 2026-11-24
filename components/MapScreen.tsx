@@ -11,7 +11,8 @@ import { getPosition, type Kakao, type LatLng } from "@/lib/kakao";
 import type { ActiveParking, RadioMessage, Settlement, SpotSummary, Wonder } from "@/lib/types";
 import { exploredCells, isInYeouido, YEOUIDO_CELLS } from "@/lib/yeouido";
 import { castleSvg, crownSvg, flagSvg, pirateColor, shipMapSvg } from "@/lib/pinHtml";
-import { chestSvg, wonderSvg } from "@/lib/pixelSprites";
+import { chestSvg, seaMonsterSvg, wonderSvg } from "@/lib/pixelSprites";
+import { setSfxOn, sfx, sfxOn } from "@/lib/sfx";
 import { useConfirm, useToast } from "./feedback";
 import KakaoMap, { type KakaoMapHandle } from "./KakaoMap";
 import NewSpotSheet, { type ExistingSpot } from "./NewSpotSheet";
@@ -143,6 +144,7 @@ export default function MapScreen({
     const res = await api<{ parking: ActiveParking }>("/api/parkings", { method: "POST", json: { spotId: spot.id } });
     setParking(res.parking);
     setSelectedId(null);
+    sfx.anchor();
     const lines = [
       `⚓ ${spot.name}에 정박했어요`,
       `${PARKING_RULE.minHours}시간 이상 머물고 출항하면 보상을 받아요`,
@@ -166,6 +168,7 @@ export default function MapScreen({
       setParking(null);
       const st = res.settlement;
       if (st?.counted) {
+        sfx.shanty();
         const lines = [
           `⛵ 출항! 인정된 정박이에요${st.earned > 0 ? ` +${st.earned}💰` : ""}`,
           ...(st.fleet ? ["⛵ 함대 집결!"] : []),
@@ -174,6 +177,7 @@ export default function MapScreen({
         if (st.events.length) navigator.vibrate?.(80);
         showToast(lines.join("\n"), 6500);
       } else {
+        sfx.setSail();
         showToast(`⛵ 출항했어요. 이번 정박은 보상이 없어요\n${st?.reason ?? ""}`, 5000);
       }
       void refresh();
@@ -755,7 +759,9 @@ function LegendSheet({ onClose }: { onClose: () => void }) {
     [<span key="e" className={`${tagCls} bg-red-600 text-white`}><Px name="warn" size="1.15em" /></span>, "해군 출몰", "30분 안에 정박 중인 선원의 경계 5 제보"],
     [svg(chestSvg(3)), "오늘의 보물상자", "오늘 처음 정박하는 선원이 획득"],
     [svg(wonderSvg(2, false)), "궁금한 곳", "누가 확인해 주길 기다리는 곳"],
+    [svg(seaMonsterSvg(1.6)), "한강 괴물", "옛 해도처럼 그려 넣은 장식이에요. 정말 있진 않아요 (아마도)"],
   ];
+  const [sound, setSound] = useState(() => (typeof window === "undefined" ? true : sfxOn()));
   return (
     <Sheet onClose={onClose} title={<h2 className="text-lg font-black"><Px name="book" size="1.15em" /> 해도 범례</h2>}>
       <ul className="space-y-2.5 pb-2">
@@ -769,6 +775,19 @@ function LegendSheet({ onClose }: { onClose: () => void }) {
           </li>
         ))}
       </ul>
+      <label className="mt-2 flex items-center justify-between border-t border-white/10 py-3 text-sm font-bold">
+        <span>효과음 (정박·출항·해전)</span>
+        <input
+          type="checkbox"
+          className="size-5 accent-amber-400"
+          checked={sound}
+          onChange={(e) => {
+            setSfxOn(e.target.checked);
+            setSound(e.target.checked);
+            if (e.target.checked) sfx.coin();
+          }}
+        />
+      </label>
     </Sheet>
   );
 }

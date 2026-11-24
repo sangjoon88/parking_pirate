@@ -6,7 +6,7 @@ import { loadKakao, type Kakao, type LatLng } from "@/lib/kakao";
 import type { RadioMessage, SpotSummary, Wonder } from "@/lib/types";
 import { clusterHtml, PIN_X_ANCHOR, pinHtml } from "@/lib/pinHtml";
 import { PX_ICONS, PX_PALETTE } from "@/lib/pixelIcons";
-import { compassSvg, spriteSvg, wonderSvg } from "@/lib/pixelSprites";
+import { compassSvg, seaMonsterSvg, spriteSvg, wonderSvg } from "@/lib/pixelSprites";
 import { YEOUIDO_CELLS } from "@/lib/yeouido";
 
 export type KakaoMapHandle = {
@@ -57,6 +57,24 @@ function radioEl(m: RadioMessage): HTMLElement {
 }
 
 const LONG_PRESS_MS = 600;
+
+/** 옛 해도 장식: 한강 위 고정 위치 (지도와 함께 움직이고 터치는 통과) */
+const DECOR_SEA_MONSTER = { lat: 37.5405, lng: 126.9225 };
+/** 이 단계보다 멀리 보면 장식을 숨긴다 */
+const DECOR_MAX_LEVEL = 7;
+
+function seaMonsterEl(): HTMLElement {
+  const el = document.createElement("div");
+  el.style.cssText = "pointer-events:none;display:flex;flex-direction:column;align-items:center;opacity:.85";
+  const pic = document.createElement("div");
+  pic.className = "pp-bob-ship";
+  pic.innerHTML = seaMonsterSvg(2.5);
+  const label = document.createElement("div");
+  label.className = "pp-oldmap-label";
+  label.textContent = "괴물 출몰 해역";
+  el.append(pic, label);
+  return el;
+}
 
 /** 이 지도 단계부터(숫자가 클수록 멀리 봄) 작은 깃발로 */
 const COMPACT_LEVEL = 5;
@@ -359,6 +377,24 @@ export default function KakaoMap({
       return o;
     });
   }, [ready, wonders]);
+
+  // 옛 해도 장식 (한 번만 만들고, 멀리 보면 숨김)
+  const decorRef = useRef<any[]>([]);
+  useEffect(() => {
+    const map = mapRef.current;
+    const kakao = kakaoRef.current;
+    if (!ready || !map || !kakao) return;
+    if (!decorRef.current.length) {
+      decorRef.current = [
+        new kakao.maps.CustomOverlay({
+          position: new kakao.maps.LatLng(DECOR_SEA_MONSTER.lat, DECOR_SEA_MONSTER.lng),
+          content: seaMonsterEl(),
+          zIndex: 0,
+        }),
+      ];
+    }
+    decorRef.current.forEach((o) => o.setMap(level <= DECOR_MAX_LEVEL ? map : null));
+  }, [ready, level]);
 
   // 무전 말풍선
   useEffect(() => {

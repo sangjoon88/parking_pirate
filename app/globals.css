@@ -248,3 +248,15 @@ select {
     animation: none !important;
   }
 }
+
+/* 옛 해도 손글씨 지명 (장식 오버레이) */
+.pp-oldmap-label {
+  margin-top: 2px;
+  font: italic 700 11px/1 "Batang", "Nanum Myeongjo", serif;
+  letter-spacing: 0.25em;
+  color: #4a2f12;
+  text-shadow:
+    0 0 3px rgba(244, 234, 210, 0.95),
+    0 0 6px rgba(244, 234, 210, 0.8);
+  white-space: nowrap;
+}
